@@ -59,7 +59,7 @@ const GQ = 1 / Math.sqrt(QN);         // scenery glyph size multiplier to keep c
 const MAXDPR = LOWQ ? 1.5 : 2;
 const TAP = IS_TOUCH ? 'tap' : 'click';
 const BACK_TXT = IS_TOUCH ? 'tap anywhere to return to the garden' : 'click anywhere or press Esc to return to the garden';
-document.getElementById('prompt').innerHTML = `&#10022; ${TAP} the bouquet &#10022;<div class="sub">${IS_TOUCH ? 'drag to turn it' : 'move your mouse to turn it'}</div>`;
+document.getElementById('prompt').innerHTML = `&#10022; ${TAP} the bouquet &#10022;`;
 document.getElementById('ghint').textContent = `${TAP} any flower to take a closer look · drag to look around`;
 if (IS_TOUCH) document.getElementById('hint').style.display = 'none';
 
@@ -70,6 +70,7 @@ function sizeCanvas() {
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
 }
 function resize() { sizeCanvas(); initStars(); }
@@ -223,22 +224,23 @@ function vivid(hex) {
 function lighten(col, k) {   // works on the hsl() strings produced by vivid()
   return col.replace(/,([\d.]+)%\)$/, (m, l) => `,${Math.min(96, +l + (100 - +l) * k).toFixed(1)}%)`);
 }
-const SPR = new Map(), SS = 40, FPX = 22;
+const SPR = new Map(), SPR_HI = new Map(), SS = 40, FPX = 22;
 const FONT = "'MS Gothic','Yu Gothic','Meiryo','Consolas',monospace";
-function sprite(ci, ch) {
-  const key = ci + '|' + ch;
-  let s = SPR.get(key);
-  if (!s) {
-    s = document.createElement('canvas'); s.width = s.height = SS;
-    const g = s.getContext('2d');
-    const col = vivid(COLORS[ci]);
-    g.font = `bold ${FPX}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 7;
-    g.fillText(ch, SS / 2, SS / 2 + 1);
-    g.shadowBlur = 2; g.fillText(ch, SS / 2, SS / 2 + 1);
-    g.shadowBlur = 0; g.fillStyle = lighten(col, 0.3); g.fillText(ch, SS / 2, SS / 2 + 1);   // bright core
-    SPR.set(key, s);
-  }
+function makeSprite(ci, ch, k) {
+  const size = SS * k, s = document.createElement('canvas'); s.width = s.height = size;
+  const g = s.getContext('2d'), col = vivid(COLORS[ci]), c = size / 2;
+  g.font = `bold ${FPX * k}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 3 * k;          // tight halo, not a blur
+  g.fillText(ch, c, c + k);
+  g.shadowBlur = 0; g.fillText(ch, c, c + k);                            // crisp solid stroke
+  g.fillStyle = lighten(col, 0.25); g.fillText(ch, c, c + k);            // bright core
+  return s;
+}
+// sprite cache; close-ups (large glyphs) use a 2x sharper sprite so they never look stretched
+function sprite(ci, ch, big) {
+  const key = ci + '|' + ch, map = big ? SPR_HI : SPR;
+  let s = map.get(key);
+  if (!s) { s = makeSprite(ci, ch, big ? 2 : 1); map.set(key, s); }
   return s;
 }
 
@@ -825,7 +827,7 @@ function startStage(s) {
 
 function enterAwait() {
   mode = 'await';
-  cam.awaitYaw = cam.yaw - pointer.nx * 1.2;    // no jump: current pointer position maps to the current angle
+  cam.awaitYaw = cam.yaw;
   setTimeout(() => { if (mode === 'await') $prompt.classList.add('show'); }, 1400);
 }
 
@@ -1640,10 +1642,10 @@ function updateCamera(dt) {
       cam.pitch = 0.25 + sway * 0.15 * Math.sin(T * 0.45);
       cam.roll = sway * 0.07 * Math.sin(T * 0.6);
     } else {
-      // finished bouquet follows the mouse / finger: left-right turns it, up-down tilts it
-      const kp = 1 - Math.exp(-dt * 3);
-      cam.yaw += (cam.awaitYaw + pointer.nx * 1.2 - cam.yaw) * kp;
-      cam.pitch += (clamp(0.25 + pointer.ny * 0.4, -0.2, 0.75) - cam.pitch) * kp;
+      // finished bouquet settles and holds perfectly still
+      const kp = 1 - Math.exp(-dt * 2);
+      cam.yaw += (cam.awaitYaw - cam.yaw) * kp;
+      cam.pitch += (0.25 - cam.pitch) * kp;
       cam.roll += (0 - cam.roll) * kp;
     }
     cam.tx = 0; cam.ty = (cam.top + cam.bot) / 2; cam.tz = 0;
@@ -1685,7 +1687,7 @@ const BUCKETS = Array.from({ length: NB }, () => []);
 const O = v3();
 function render(dt) {
   ctx.globalAlpha = 1;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillStyle = '#000';            // full clear every frame: no motion trails, no smear
   ctx.fillRect(0, 0, W, H);
   drawStars(dt);
 
@@ -1766,7 +1768,7 @@ function render(dt) {
     for (const p of b) {
       const s = p.ds;
       ctx.globalAlpha = p.da;
-      ctx.drawImage(sprite(p.dci, p.ch), p.px - s / 2, p.py - s / 2, s, s);
+      ctx.drawImage(sprite(p.dci, p.ch, s * DPR > SS * 1.1), p.px - s / 2, p.py - s / 2, s, s);
     }
   }
   ctx.globalAlpha = 1;
@@ -1800,11 +1802,11 @@ const mouse = pointer;
 // adaptive resolution: if frames get slow, render at a lower pixel ratio (and recover when fast again)
 let perfAcc = 0, perfN = 0, perfT = 0;
 function adaptQuality(raw, now) {
-  if (raw > 0.25 || paused) return;
+  if (!LOWQ || raw > 0.25 || paused) return;     // desktops always render at full sharpness
   perfAcc += raw; perfN++;
   if (now - perfT < 2) return;
   const avg = perfAcc / perfN; perfAcc = 0; perfN = 0; perfT = now;
-  if (avg > 1 / 40 && dprScale > 0.5) { dprScale = Math.max(0.5, dprScale * 0.8); sizeCanvas(); }
+  if (avg > 1 / 40 && dprScale > 0.8) { dprScale = Math.max(0.8, dprScale * 0.9); sizeCanvas(); }
   else if (avg < 1 / 57 && dprScale < 1) { dprScale = Math.min(1, dprScale * 1.15); sizeCanvas(); }
 }
 function frame(ms) {
