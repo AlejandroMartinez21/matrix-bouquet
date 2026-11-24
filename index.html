@@ -165,11 +165,14 @@ fam('dragon',     ['#3fe0d0', '#4aa8f0']);
 fam('snailShell', ['#d9a066', '#c98a50']);
 fam('snailBody',  ['#d8e0a8']);
 // the cat
-fam('catOrange',  ['#ffb066', '#ffa552', '#ffbb7a']);
-fam('catStripe',  ['#e0803a', '#d47530']);
-fam('catWhite',   ['#fff3e6', '#ffffff']);
+fam('catBlack',   ['#3a3a4a', '#33334a', '#424256']);   // tuxedo coat (charcoal so it still glints)
+fam('catWhite',   ['#ffffff', '#f6f6ff']);
+fam('catOutline', ['#ffffff']);
 fam('catPink',    ['#ff9bb8']);
-fam('catEye',     ['#7a4a20']);
+fam('catEye',     ['#dcdcee']);                         // closed-eye lines on the dark face
+fam('catGreen',   ['#c8f05a']);                         // open eyes
+fam('catMouth',   ['#8a8aa0']);
+const CAT_OUTLINE = FAMS.catOutline[0];
 const FLASH = cidx('#ffffff');
 
 const SCHEME = {
@@ -1148,6 +1151,23 @@ function buildGardenExtras(add, wave, fly) {
     }
     hexDisk(17, 5, (dx, dz) => { if (Math.hypot(dx, dz) < 17) add(BB.x + dx, gy + 34, BB.z + dz, { gs: G.water, fam: FAMS.water, gm: 1.1, am: 0.8 }); });
   }
+  // lush, dense grass patch around the cat: short near him, taller further out
+  {
+    const nb = Math.round(320 * QN);
+    for (let i = 0; i < nb; i++) {
+      const a = rand(TAU), r = 34 + Math.sqrt(Math.random()) * 85, bx = CAT.x + Math.cos(a) * r * 1.15, bz = CAT.z + Math.sin(a) * r;
+      const gy = hgt(bx, bz), h = 7 + (r - 34) * 0.18 + rand(4), la = rand(TAU), lean = rand(0.2, 0.5), k = Math.max(2, Math.ceil(h / 6));
+      const fm = FAMS[pick(['green', 'leaf', 'fern', 'leaf'])];
+      for (let j = 0; j < k; j++) {
+        const fr = k > 1 ? j / (k - 1) : 1;
+        add(bx + Math.cos(la) * fr * fr * h * lean, gy + fr * h, bz + Math.sin(la) * fr * fr * h * lean, { gs: G.grass, fam: fm, sw: fr, gm: 1.2 });
+      }
+    }
+    for (let i = 0; i < Math.round(140 * QN); i++) {   // dense ground cover under and around him
+      const a = rand(TAU), r = Math.sqrt(Math.random()) * 110, x = CAT.x + Math.cos(a) * r * 1.15, z = CAT.z + Math.sin(a) * r;
+      add(x, hgt(x, z) + 0.5, z, { gs: G.grass, fam: FAMS[pick(['leaf', 'green'])], gm: 1.2 });
+    }
+  }
   buildCritters(fly, wave);
   buildCat(fly, wave);
 }
@@ -1291,49 +1311,50 @@ function buildCat(fly, wave) {
     const p = P(e, Object.assign({ lx: lx * s, ly: ly * s, lz: lz * s, gs: G.cat, fam: FAMS[fm], gm, part: 'body' }, fly, props));
     p.delay = d0 + rand(0.6); return p;
   };
-  // checkered picnic blanket under the cat
-  hexDisk(38, sp * 1.1, (x, z) => {
-    if (Math.hypot(x, z) > 38) return;
-    const chk = ((Math.floor((x + 40) / 9) + Math.floor((z + 40) / 9)) & 1);
-    add(x, 0.4, z, chk ? 'pinkLight' : 'white', { part: 'mat', gs: G.soft, gm: gm * 1.1, am: 0.8 });
-  });
-  // the loaf: body tucked into a rounded bread shape
+  const nrm = (x, y, z) => { const l = Math.hypot(x, y, z) || 1; return { x: x / l, y: y / l, z: z / l }; };
+  // the loaf: body tucked into a rounded bread shape (tuxedo: black coat, white bib)
   ellipsoidPts(0, 11, 0, 22, 11, 13, sp, (x, y, z) => {
     if (y < 0.5) return;
-    const chest = x > 15 && y < 13, stripe = Math.sin(x * 0.45) > 0.55 && y > 8;
-    add(x, y, z, chest ? 'catWhite' : stripe ? 'catStripe' : 'catOrange');
+    const bib = x > 14 && y < 14 && Math.abs(z) < 8.5;
+    add(x, y, z, bib ? 'catWhite' : 'catBlack', { cn: nrm(x / 484, (y - 11) / 121, z / 169) });
   });
-  // head
+  // head (black with white muzzle, chin and a blaze up the middle)
   ellipsoidPts(21, 20, 0, 9, 8.5, 9, sp, (x, y, z) => {
     const dx = x - 21, dy = y - 20;
-    const muzzle = dx > 5 && dy < 0, stripe = dy > 4 && Math.abs(z) < 3.5 && Math.sin(dx * 1.2) > 0;
-    add(x, y, z, muzzle ? 'catWhite' : stripe ? 'catStripe' : 'catOrange', { part: 'head' });
+    const white = (dx > 5 && dy < 0.5) || (dx > 5.5 && Math.abs(z) < 1.9 && dy < 5) || (dy < -5 && dx > 2);
+    add(x, y, z, white ? 'catWhite' : 'catBlack', { part: 'head', cn: nrm(dx / 81, dy / 72.25, z / 81) });
   });
-  // ears
+  // ears: black with pink insides, edges always outlined
   for (const sd of [-1, 1]) for (let t = 0; t <= 1.001; t += 0.16) {
     const width = (1 - t) * 5.5, zc = sd * (5.2 + t * 0.8);
-    for (let w = -width / 2; w <= width / 2 + 0.01; w += 1.7)
-      add(19.5, 26 + t * 8, zc + w, Math.abs(w) < width * 0.25 && t < 0.6 ? 'catPink' : 'catOrange', { part: 'ear' });
+    for (let w = -width / 2; w <= width / 2 + 0.01; w += 1.7) {
+      const edge = Math.abs(w) > width / 2 - 1 || t > 0.9;
+      add(19.5, 26 + t * 8, zc + w, edge ? 'catOutline' : Math.abs(w) < width * 0.25 && t < 0.6 ? 'catPink' : 'catBlack', { part: 'ear' });
+    }
   }
   // face: closed, content eyes, pink nose, little mouth, whiskers
   for (const sd of [-1, 1]) e.eyes.push(add(29.6, 21.5, sd * 3.6, 'catEye', { ch: '-', gs: ['-'], fixed: true, part: 'head' }));
   add(30.4, 19, 0, 'catPink', { ch: 'v', gs: ['v'], fixed: true, part: 'head' });
-  add(30.1, 17.4, 0, 'catEye', { ch: 'ω', gs: ['ω'], fixed: true, part: 'head' });
+  add(30.1, 17.4, 0, 'catMouth', { ch: 'ω', gs: ['ω'], fixed: true, part: 'head' });
   for (const sd of [-1, 1]) for (const k of [0, 1]) add(29.5, 18.6 - k * 1.3, sd * (6 + k * 0.6), 'catWhite', { ch: '-', gs: ['-'], fixed: true, part: 'head' });
-  for (const sd of [-1, 1]) add(24, 1.5, sd * 4, 'catWhite', { ch: 'o', gs: ['o'], fixed: true });   // paw tips peeking out
-  // tail wrapped around the side
-  for (let t = 0; t <= 1.001; t += 0.035) {
-    const th = Math.PI - t * 0.75 * Math.PI, x = Math.cos(th) * 24, z = Math.sin(th) * 16;
-    const fm = (t * 12 | 0) % 2 ? 'catStripe' : 'catOrange';
-    add(x, 3.6, z, fm, { part: 'tail', tt: t });
-    add(x * 1.07, 2.2, z * 1.07, fm, { part: 'tail', tt: t });
+  // white paws peeking out under the bib
+  for (const sd of [-1, 1]) for (const [px, py] of [[23, 1.4], [25.5, 1.6], [24.2, 3]]) add(px, py, sd * 4.2, 'catWhite', { ch: 'o', gs: ['o', '0'] });
+  // tail: a tube wrapped around the side (with normals so its silhouette gets outlined too)
+  for (let t = 0; t <= 1.001; t += 0.03) {
+    const th = Math.PI - t * 0.75 * Math.PI, cx = Math.cos(th) * 24, cz = Math.sin(th) * 16;
+    const ox = Math.cos(th), oz = Math.sin(th), r = 2.7 - t * 0.6;
+    for (let k = 0; k < 6; k++) {
+      const ps = k / 6 * TAU, ux = ox * Math.cos(ps), uy = Math.sin(ps), uz = oz * Math.cos(ps);
+      if (3 + uy * r < 0.3) continue;
+      add(cx + ux * r, 3 + uy * r, cz + uz * r, t > 0.9 ? 'catWhite' : 'catBlack', { part: 'tail', tt: t, cn: nrm(ux, uy, uz) });
+    }
   }
   // dozing z's
   e.zz = [0, 0.33, 0.66].map(c => add(0, 0, 0, 'zz', { ch: 'z', gs: ['z', 'Z'], part: 'zz', cph: c, gm: gm * 1.3 }));
 }
 function updCat(e) {
   const open = (T % 11) < 1.0;              // a slow blink every so often
-  for (const p of e.eyes) { p.ch = open ? 'o' : '-'; p.ci = open ? FAMS.leaf[0] : FAMS.catEye[0]; }
+  for (const p of e.eyes) { p.ch = open ? 'o' : '-'; p.ci = open ? FAMS.catGreen[0] : FAMS.catEye[0]; }
 }
 
 /* ---------- zoom into a single flower ---------- */
@@ -1726,6 +1747,13 @@ function render(dt) {
         a *= nzr < -0.05 ? 0.45 : (0.85 + 0.15 * nzr);
       }
       const e = p.el;
+      // cat silhouette: glyphs whose surface turns edge-on to the camera are drawn white
+      p.sil = false;
+      if (p.cn) {
+        const n = p.cn, X2 = e.fwd.x * n.x + e.side.x * n.z, Z2 = e.fwd.z * n.x + e.side.z * n.z;
+        const nzv = n.y * sxR + (-X2 * syR + Z2 * cyR) * cxR;
+        if (Math.abs(nzv) < 0.38) { p.sil = true; a = 1; }
+      }
       const gm = e.type === 'flower' ? (e.size / e.base) * (e.gsp / SP) : p.gm;
       ds = SPR_K * kk * gm;
       if (ds > 90) { a *= Math.max(0, 1 - (ds - 90) / 60); if (a <= 0.02) continue; }
@@ -1754,7 +1782,7 @@ function render(dt) {
     }
     if (x < -40 || x > W + 40 || y < -60 || y > H + 40) continue;
     p.da = a * p.am; p.ds = ds;
-    p.dci = (p.state === 2 && T - p.st < 0.22) ? FLASH : p.ci;
+    p.dci = (p.state === 2 && T - p.st < 0.22) ? FLASH : p.sil ? CAT_OUTLINE : p.ci;
     BUCKETS[bi].push(p);
   }
 
