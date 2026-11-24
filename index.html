@@ -195,6 +195,10 @@ function sprite(ci, ch) {
   if (!s) {
     s = document.createElement('canvas'); s.width = s.height = SS;
     const g = s.getContext('2d');
+    // soft dark backing disc: glyphs drawn in front hide the ones behind, so shapes read as solid
+    const bg = g.createRadialGradient(SS / 2, SS / 2, 0, SS / 2, SS / 2, SS * 0.36);
+    bg.addColorStop(0, 'rgba(0,0,0,0.92)'); bg.addColorStop(0.7, 'rgba(0,0,0,0.85)'); bg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = bg; g.fillRect(0, 0, SS, SS);
     g.font = `${FPX}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = COLORS[ci]; g.shadowColor = COLORS[ci]; g.shadowBlur = 4;
     g.fillText(ch, SS / 2, SS / 2 + 1);
@@ -205,13 +209,13 @@ function sprite(ci, ch) {
 }
 
 /* ---------- constants ---------- */
-const SP = 3.9;          // flower glyph spacing (model units)
-const SPV = 4.8;         // vase spacing
-const SPS = 4.0;         // stem spacing
-const GSP = 6.2;         // garden flower spacing (garden is far bigger, so glyphs are coarser)
-const SPR_K = SP * 1.05 * SS / FPX;
+const SP = 3.6;          // flower glyph spacing (model units)
+const SPV = 4.4;         // vase spacing
+const SPS = 3.7;         // stem spacing
+const GSP = 5.6;         // garden flower spacing (garden is far bigger, so glyphs are coarser)
+const SPR_K = SP * 1.2 * SS / FPX;   // glyphs slightly larger than their spacing so they overlap into solid shapes
 const DCAM = 1100;
-const NB = 40;
+const NB = 128;          // depth layers (finer = cleaner front/back occlusion)
 const COUNTS = [1, 3, 5, 8, 11, 15, 19, 24, 29, 35];
 const FILL   = [0, 2, 4, 6, 9, 12, 15, 19, 23, 28];
 const SPRIGS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];      // non-flower greenery in the bouquet
@@ -1667,7 +1671,7 @@ function render(dt) {
       const kk = cS / den;
       const tx = cxS + x3 * kk, ty = cyS - y3 * kk;
       let zn = z2 / (half * 1.3); zn = zn < -1 ? -1 : zn > 1 ? 1 : zn;
-      a = 0.6 + 0.4 * zn;
+      a = 0.5 + 0.5 * zn;
       if (p.hasN) {
         const nzr = (-p.nx * syR + p.nz * cyR) * cxR;
         if (nzr < -0.3 && p.state === 2 && !p.el.def.glass) continue;
