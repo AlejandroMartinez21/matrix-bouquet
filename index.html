@@ -2,24 +2,31 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Matrix Bouquet</title>
 <style>
-  html,body{margin:0;height:100%;background:#000;overflow:hidden}
-  canvas{display:block}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none;
+    touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  canvas{display:block;touch-action:none}
   .ui{position:fixed;font-family:Consolas,'MS Gothic',monospace;pointer-events:none;user-select:none}
-  #hint{left:16px;bottom:12px;color:#ff8cc6;font-size:12px;opacity:.55;transition:opacity 2s}
-  #prompt{left:0;right:0;bottom:9%;text-align:center;color:#ffb6db;font-size:22px;letter-spacing:.35em;
+  #hint{left:calc(16px + env(safe-area-inset-left));bottom:calc(12px + env(safe-area-inset-bottom));color:#ff8cc6;font-size:12px;opacity:.55;transition:opacity 2s}
+  #prompt{left:0;right:0;bottom:calc(9% + env(safe-area-inset-bottom));text-align:center;color:#ffb6db;
+    font-size:clamp(15px,4.6vw,22px);letter-spacing:.3em;padding:0 12px;
     text-shadow:0 0 8px #ff5aa8,0 0 22px #ff5aa8;opacity:0;transition:opacity 1.2s}
+  #prompt .sub{font-size:.55em;letter-spacing:.2em;opacity:.75;margin-top:.7em}
   #prompt.show{opacity:1;animation:pulse 1.8s ease-in-out infinite}
   @keyframes pulse{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.06);filter:brightness(1.5)}}
-  #info{left:18px;top:16px;color:#ffd6ea;font-size:14px;line-height:1.6;opacity:0;transition:opacity .8s;
-    text-shadow:0 0 6px #ff5aa8;max-width:min(420px,80vw)}
+  #info{left:calc(16px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));color:#ffd6ea;
+    font-size:clamp(12px,3.4vw,14px);line-height:1.6;opacity:0;transition:opacity .8s;
+    text-shadow:0 0 6px #ff5aa8;max-width:min(420px,calc(100vw - 32px))}
   #info.show{opacity:1}
-  #info b{color:#fff;font-size:18px;letter-spacing:.2em}
+  #info b{color:#fff;font-size:clamp(14px,4.4vw,18px);letter-spacing:.2em}
   #info .bee{color:#ffd66b}
   #info .dim{color:#ff8cc6;opacity:.7;font-size:12px}
-  #ghint{left:0;right:0;bottom:4%;text-align:center;color:#ff8cc6;font-size:14px;letter-spacing:.2em;opacity:0;transition:opacity 1.5s;text-shadow:0 0 6px #ff5aa8}
+  #ghint{left:0;right:0;bottom:calc(4% + env(safe-area-inset-bottom));text-align:center;color:#ff8cc6;
+    font-size:clamp(12px,3.5vw,14px);letter-spacing:.2em;padding:0 12px;opacity:0;transition:opacity 1.5s;text-shadow:0 0 6px #ff5aa8}
   #ghint.show{opacity:.85}
 </style>
 </head>
@@ -42,16 +49,30 @@
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const $prompt = document.getElementById('prompt'), $info = document.getElementById('info'),
       $ghint = document.getElementById('ghint'), $hint = document.getElementById('hint');
-let W, H, DPR;
-function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
+/* ---------- device profile: phones / tablets / weak machines get a lighter scene ---------- */
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+const SMALL = Math.min(screen.width, screen.height) < 820;
+const LOWQ = IS_TOUCH || SMALL || (navigator.hardwareConcurrency || 8) <= 4;
+const QS = LOWQ ? 1.3 : 1;            // glyph spacing multiplier (bigger glyphs, ~40% fewer)
+const QN = LOWQ ? 0.6 : 1;            // scenery count multiplier
+const GQ = 1 / Math.sqrt(QN);         // scenery glyph size multiplier to keep coverage
+const MAXDPR = LOWQ ? 1.5 : 2;
+const TAP = IS_TOUCH ? 'tap' : 'click';
+const BACK_TXT = IS_TOUCH ? 'tap anywhere to return to the garden' : 'click anywhere or press Esc to return to the garden';
+document.getElementById('prompt').innerHTML = `&#10022; ${TAP} the bouquet &#10022;<div class="sub">${IS_TOUCH ? 'drag to turn it' : 'move your mouse to turn it'}</div>`;
+document.getElementById('ghint').textContent = `${TAP} any flower to take a closer look`;
+if (IS_TOUCH) document.getElementById('hint').style.display = 'none';
+
+let W, H, DPR, dprScale = 1;
+function sizeCanvas() {
+  DPR = Math.min(MAXDPR, window.devicePixelRatio || 1) * dprScale;
   W = innerWidth; H = innerHeight;
-  cv.width = W * DPR; cv.height = H * DPR;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-  initStars();
 }
+function resize() { sizeCanvas(); initStars(); }
 
 /* ---------- helpers ---------- */
 const TAU = Math.PI * 2, GA = Math.PI * (3 - Math.sqrt(5));
@@ -209,10 +230,10 @@ function sprite(ci, ch) {
 }
 
 /* ---------- constants ---------- */
-const SP = 3.6;          // flower glyph spacing (model units)
-const SPV = 4.4;         // vase spacing
-const SPS = 3.7;         // stem spacing
-const GSP = 5.6;         // garden flower spacing (garden is far bigger, so glyphs are coarser)
+const SP = 3.6 * QS;     // flower glyph spacing (model units)
+const SPV = 4.4 * QS;    // vase spacing
+const SPS = 3.7 * QS;    // stem spacing
+const GSP = 5.6 * QS;    // garden flower spacing (garden is far bigger, so glyphs are coarser)
 const SPR_K = SP * 1.2 * SS / FPX;   // glyphs slightly larger than their spacing so they overlap into solid shapes
 const DCAM = 1100;
 const NB = 128;          // depth layers (finer = cleaner front/back occlusion)
@@ -791,6 +812,7 @@ function startStage(s) {
 
 function enterAwait() {
   mode = 'await';
+  cam.awaitYaw = cam.yaw - pointer.nx * 1.2;    // no jump: current pointer position maps to the current angle
   setTimeout(() => { if (mode === 'await') $prompt.classList.add('show'); }, 1400);
 }
 
@@ -872,7 +894,8 @@ function explode() {
   gardenReadyAt = T + 6.5;
   setTimeout(() => { if (mode === 'garden' && !zf) $ghint.classList.add('show'); }, 7000);
 }
-function overviewS() { return Math.min(W * gcam.D / 2150, H * gcam.D / 1250); }
+// portrait screens crop the sides a little (the garden slowly turns, so everything still comes into view)
+function overviewS() { return Math.min(W * gcam.D / (W < H ? 1250 : 2150), H * gcam.D / 1250); }
 
 function buildGarden(t0, ex, ey) {
   gardenFlowers = [];
@@ -898,9 +921,9 @@ function buildGarden(t0, ex, ey) {
     for (let i = 0; i < 26; i++) list.push(mkSpec(pick(bed.kinds)));
     list.sort((a, b) => b.size - a.size);
     let n = 0;
-    for (const s of list) { if (n >= 17) break; if (tryPlace(s, samp, 40)) n++; }
+    for (const s of list) { if (n >= Math.round(17 * QN + 2)) break; if (tryPlace(s, samp, 40)) n++; }
   }
-  for (let i = 0; i < 14; i++)   // a few wildflowers dotted on the lawn
+  for (let i = 0; i < Math.round(14 * QN); i++)   // a few wildflowers dotted on the lawn
     tryPlace(mkSpec(pick(['daisy', 'daisy', 'cosmos', 'tulip'])), () => { const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.92; return [Math.cos(a) * r * GX, Math.sin(a) * r * GZ]; }, 30);
   const addFlower = (k, scheme, size, x, z, headY, baseY, n, noLeaves) => {
     const f = makeFlowerEl(k, scheme, size);
@@ -921,11 +944,11 @@ function buildGarden(t0, ex, ey) {
   }
 
   const g = { type: 'static', parts: [] }; elements.push(g);
-  const add = (x, y, z, props) => { const p = P(g, Object.assign({ lx: x, ly: y, lz: z, sw: 0 }, fly, props)); p.delay = wave(x, z); return p; };
+  const add = (x, y, z, props) => { const p = P(g, Object.assign({ lx: x, ly: y, lz: z, sw: 0 }, fly, props)); p.gm *= GQ; p.delay = wave(x, z); return p; };
   const inEll = (x, z, k) => (x / (GX * k)) ** 2 + (z / (GZ * k)) ** 2 < 1;
 
   // ---- pond: water, stones, lily pads, lotus ----
-  for (let x = PX - PRX; x <= PX + PRX; x += 13) for (let z = PZ - PRZ; z <= PZ + PRZ; z += 13) {
+  for (let x = PX - PRX; x <= PX + PRX; x += 13 * GQ) for (let z = PZ - PRZ; z <= PZ + PRZ; z += 13 * GQ) {
     const jx = x + rand(-3, 3), jz = z + rand(-3, 3);
     if (pondD(jx, jz) > 0.97) continue;
     add(jx, WL, jz, { gs: G.water, fam: FAMS.water, gm: 1.5, am: 0.75 });
@@ -957,13 +980,13 @@ function buildGarden(t0, ex, ey) {
   }
 
   // ---- ground cover (follows the rolling hills) ----
-  for (let x = -GX * 1.1; x <= GX * 1.1; x += 32) for (let z = -GZ * 1.1; z <= GZ * 1.1; z += 32) {
+  for (let x = -GX * 1.1; x <= GX * 1.1; x += 32 * GQ) for (let z = -GZ * 1.1; z <= GZ * 1.1; z += 32 * GQ) {
     const jx = x + rand(-11, 11), jz = z + rand(-11, 11);
     if (!inEll(jx, jz, 1.1) || pondD(jx, jz) < 1.0 || inBed(jx, jz)) continue;
     add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.ground, gm: 1.5, am: 0.5 });
   }
   // ---- grass blades ----
-  for (let i = 0; i < 420; i++) {
+  for (let i = 0; i < Math.round(420 * QN); i++) {
     const a = rand(TAU), r = Math.sqrt(Math.random()) * 1.05, bx = Math.cos(a) * r * GX, bz = Math.sin(a) * r * GZ;
     if (pondD(bx, bz) < 1.02 || Math.abs(bx - pathX(bz)) < 18 || inBed(bx, bz) || Math.hypot(bx - CAT.x, bz - CAT.z) < 45) continue;
     const gy = hgt(bx, bz), h = rand(14, 44), la = rand(TAU), lean = rand(0.2, 0.6), k = Math.max(3, Math.ceil(h / 9));
@@ -990,7 +1013,7 @@ function buildGarden(t0, ex, ey) {
     }
     crowns.push([tx + lean, gy + th + 15, tz, rand(45, 60)]);
     for (const [cx, cy, cz, R] of crowns) {
-      const cell = 11, N = Math.round(4 * Math.PI * R * R / (cell * cell));
+      const cell = 11 * GQ, N = Math.round(4 * Math.PI * R * R / (cell * cell));
       for (let j = 0; j < N; j++) {
         const zf = 1 - 2 * (j + .5) / N; if (zf < -0.55) break;
         const rr = Math.sqrt(1 - zf * zf), a = j * GA, bump = 1 + 0.12 * Math.sin(a * 6 + zf * 5);
@@ -1005,7 +1028,7 @@ function buildGarden(t0, ex, ey) {
     }
   }
   // ---- fireflies ----
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < Math.round(50 * QN); i++) {
     const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.95, x = Math.cos(a) * r * GX, z = Math.sin(a) * r * GZ;
     const p = P(drift, Object.assign({ gs: ['·', '*', '+'], fam: FAMS.firefly, gm: 1.3, mode: 'fly',
       bx: x, by: hgt(x, z) + rand(25, 90), bz: z, ph: rand(TAU), ph2: rand(TAU) }, fly));
@@ -1061,7 +1084,7 @@ function buildGarden(t0, ex, ey) {
 function buildGardenExtras(add, wave, fly) {
   for (const bed of BEDS) {
     // tilled soil inside each bed
-    for (let x = bed.x - bed.rx; x <= bed.x + bed.rx; x += 17) for (let z = bed.z - bed.rz; z <= bed.z + bed.rz; z += 17) {
+    for (let x = bed.x - bed.rx; x <= bed.x + bed.rx; x += 17 * GQ) for (let z = bed.z - bed.rz; z <= bed.z + bed.rz; z += 17 * GQ) {
       const jx = x + rand(-5, 5), jz = z + rand(-5, 5);
       if (((jx - bed.x) / bed.rx) ** 2 + ((jz - bed.z) / bed.rz) ** 2 > 0.92) continue;
       add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.soilBed, gm: 1.4, am: 0.7 });
@@ -1074,7 +1097,7 @@ function buildGardenExtras(add, wave, fly) {
     }
   }
   // white picket fence around the back and sides (front left open for the view)
-  for (let i = 0, n = 640; i < n; i++) {
+  for (let i = 0, n = Math.round(640 * QN); i < n; i++) {
     const a = i / n * TAU; if (Math.sin(a) > 0.35) continue;
     const x = Math.cos(a) * GX * 1.1, z = Math.sin(a) * GZ * 1.1, gy = hgt(x, z);
     if (i % 3 === 0) for (let y = 0; y <= 40; y += 5) add(x, gy + y, z, { gs: y > 36 ? ['^'] : G.fence, fam: FAMS.picket, gm: 1.2 });
@@ -1239,7 +1262,7 @@ function ellipsoidPts(cx, cy, cz, a, b, c, sp, fn) {
   }
 }
 function buildCat(fly, wave) {
-  const s = CAT.s, sp = 3.3;
+  const s = CAT.s, sp = 3.3 * QS;
   const e = { type: 'cat', isCat: true, kind: 'cat', parts: [], s, size: 40, still: false,
     fwd: v3(Math.cos(CAT.a), 0, Math.sin(CAT.a)), side: v3(-Math.sin(CAT.a), 0, Math.cos(CAT.a)),
     base: v3(CAT.x, hgt(CAT.x, CAT.z), CAT.z), eyes: [] };
@@ -1308,7 +1331,7 @@ function zoomTo(f) {
       `<span class="bee">&#128049; tucked into a perfect loaf</span><br>` +
       `<span class="bee">purring softly, eyes half closed</span><br>` +
       `<span class="bee">tail twitches now and then</span><br>` +
-      `<span class="dim">click anywhere or press Esc to return to the garden</span>`;
+      `<span class="dim">${BACK_TXT}</span>`;
     $info.classList.add('show');
     return;
   }
@@ -1320,7 +1343,7 @@ function zoomTo(f) {
   const name = (SCHEME_NAME[f.scheme] ? SCHEME_NAME[f.scheme] + ' ' : '') + KIND_NAME[f.kind];
   $info.innerHTML = `<b>${name.toUpperCase()}</b><br>` +
     acts.map(a => `<span class="bee">&#128029; ${a[1]}</span>`).join('<br>') +
-    `<br><span class="dim">click anywhere or press Esc to return to the garden</span>`;
+    `<br><span class="dim">${BACK_TXT}</span>`;
   $info.classList.add('show');
 }
 
@@ -1584,16 +1607,24 @@ function updateCamera(dt) {
   if (mode === 'grow' || mode === 'await') {
     const kc = 1 - Math.exp(-dt * 1.6);
     cam.top += (cam.tTop - cam.top) * kc; cam.bot += (cam.tBot - cam.bot) * kc; cam.bhalf += (cam.tHalf - cam.bhalf) * kc;
-    const zoom = Math.min(2.0, H * 0.8 / (cam.top - cam.bot), W * 0.84 / (2 * cam.bhalf));
+    const zoom = Math.min(2.0, H * (W < H ? 0.72 : 0.8) / (cam.top - cam.bot), W * (W < H ? 0.94 : 0.84) / (2 * cam.bhalf));
     const growing = mode === 'grow';
     const omT = growing && stage > 0 ? 0.32 : 0;
     const swT = growing ? (stage === 0 ? 0.2 : 1) : 0;
     const km = 1 - Math.exp(-dt * (growing ? 0.8 : 1.4));
     omega += (omT - omega) * km; sway += (swT - sway) * km;
     motion += ((growing ? 1 : 0) - motion) * km;
-    cam.yaw += omega * dt;
-    cam.pitch = 0.25 + sway * 0.15 * Math.sin(T * 0.45);
-    cam.roll = sway * 0.07 * Math.sin(T * 0.6);
+    if (growing) {
+      cam.yaw += omega * dt;
+      cam.pitch = 0.25 + sway * 0.15 * Math.sin(T * 0.45);
+      cam.roll = sway * 0.07 * Math.sin(T * 0.6);
+    } else {
+      // finished bouquet follows the mouse / finger: left-right turns it, up-down tilts it
+      const kp = 1 - Math.exp(-dt * 3);
+      cam.yaw += (cam.awaitYaw + pointer.nx * 1.2 - cam.yaw) * kp;
+      cam.pitch += (clamp(0.25 + pointer.ny * 0.4, -0.2, 0.75) - cam.pitch) * kp;
+      cam.roll += (0 - cam.roll) * kp;
+    }
     cam.tx = 0; cam.ty = (cam.top + cam.bot) / 2; cam.tz = 0;
     cam.D = DCAM; cam.S = zoom * DCAM; cam.half = cam.bhalf;
     return;
@@ -1735,7 +1766,7 @@ function pickFlower(mx, my) {
   let best = null, bz = -Infinity;
   for (const f of catEl ? gardenFlowers.concat([catEl]) : gardenFlowers) {
     if (!project(f.p.x, f.p.y, f.p.z, PO)) continue;
-    const r = f.size * PO.k * 1.15 + 6;
+    const r = f.size * PO.k * 1.15 + (IS_TOUCH ? 22 : 6);   // fingers get a bigger target
     if (Math.hypot(PO.x - mx, PO.y - my) < r && PO.z > bz) { bz = PO.z; best = f; }
   }
   return best;
@@ -1743,10 +1774,22 @@ function pickFlower(mx, my) {
 
 /* ---------- main loop ---------- */
 let last = performance.now() / 1000;
-const mouse = { x: -1, y: -1 };
+const pointer = { x: -1, y: -1, nx: 0, ny: 0, down: null };
+const mouse = pointer;
+// adaptive resolution: if frames get slow, render at a lower pixel ratio (and recover when fast again)
+let perfAcc = 0, perfN = 0, perfT = 0;
+function adaptQuality(raw, now) {
+  if (raw > 0.25 || paused) return;
+  perfAcc += raw; perfN++;
+  if (now - perfT < 2) return;
+  const avg = perfAcc / perfN; perfAcc = 0; perfN = 0; perfT = now;
+  if (avg > 1 / 40 && dprScale > 0.5) { dprScale = Math.max(0.5, dprScale * 0.8); sizeCanvas(); }
+  else if (avg < 1 / 57 && dprScale < 1) { dprScale = Math.min(1, dprScale * 1.15); sizeCanvas(); }
+}
 function frame(ms) {
-  const now = ms / 1000;
-  let dt = Math.min(0.05, now - last); last = now;
+  const now = ms / 1000, raw = now - last;
+  let dt = Math.min(0.05, raw); last = now;
+  adaptQuality(raw, now);
   if (paused) dt = 0;
   T += dt;
 
@@ -1770,12 +1813,16 @@ function frame(ms) {
   requestAnimationFrame(frame);
 }
 
-function onClick(e) {
+function onTap(x, y) {
   if (mode === 'await') explode();
   else if (mode === 'garden') {
     if (zf) zoomOut();
-    else if (T > gardenReadyAt) { const f = pickFlower(e.clientX, e.clientY); if (f) zoomTo(f); }
+    else if (T > gardenReadyAt) { const f = pickFlower(x, y); if (f) zoomTo(f); }
   }
+}
+function setPointer(e) {
+  pointer.x = e.clientX; pointer.y = e.clientY;
+  pointer.nx = clamp(e.clientX / W * 2 - 1, -1, 1); pointer.ny = clamp(e.clientY / H * 2 - 1, -1, 1);
 }
 function skip() {
   if (mode === 'grow') { if (stage < VASES.length - 1) startStage(stage + 1); else enterAwait(); }
@@ -1786,8 +1833,16 @@ addEventListener('keydown', e => {
   else if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowRight') skip();
   else if (e.key === 'Escape') zoomOut();
 });
-cv.addEventListener('click', onClick);
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+// pointer events cover mouse, touch and pen; a tap is a press that barely moved (a drag just turns the bouquet)
+cv.addEventListener('pointermove', setPointer);
+cv.addEventListener('pointerdown', e => { setPointer(e); pointer.down = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener('pointerup', e => {
+  const d = pointer.down; pointer.down = null;
+  if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 14) onTap(e.clientX, e.clientY);
+});
+cv.addEventListener('pointercancel', () => { pointer.down = null; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('visibilitychange', () => { last = performance.now() / 1000; });
 addEventListener('resize', resize);
 setTimeout(() => $hint.style.opacity = 0, 7000);
 
