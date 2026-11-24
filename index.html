@@ -1164,7 +1164,7 @@ function buildGardenExtras(add, wave, fly) {
       }
     }
     for (let i = 0; i < Math.round(140 * QN); i++) {   // dense ground cover under and around him
-      const a = rand(TAU), r = Math.sqrt(Math.random()) * 110, x = CAT.x + Math.cos(a) * r * 1.15, z = CAT.z + Math.sin(a) * r;
+      const a = rand(TAU), r = 36 + Math.sqrt(Math.random()) * 80, x = CAT.x + Math.cos(a) * r * 1.15, z = CAT.z + Math.sin(a) * r;
       add(x, hgt(x, z) + 0.5, z, { gs: G.grass, fam: FAMS[pick(['leaf', 'green'])], gm: 1.2 });
     }
   }
