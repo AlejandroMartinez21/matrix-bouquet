@@ -78,9 +78,9 @@ fam('blush',      ['#ffd9ea', '#ffe6f1', '#ffcfe3']);
 fam('pink',       ['#ff6fb5', '#ff85c2', '#ff5aa8', '#ff9bcf']);
 fam('pinkDark',   ['#c8327a', '#b02468', '#d94b8c']);
 fam('pinkLight',  ['#ffb6db', '#ffc8e4', '#ffa6d2']);
-fam('maroon',     ['#b0173f', '#9c1236', '#c4244f', '#a8163c']);
-fam('maroonDark', ['#6a0820', '#7a0c27', '#5c061a']);
-fam('maroonLight',['#d6466b', '#dd5a7b']);
+fam('maroon',     ['#c01d4a', '#b0173f', '#d02a58', '#a8163c']);
+fam('maroonDark', ['#7a0c27', '#8a1030', '#6a0820']);
+fam('maroonLight',['#e0557a', '#e86a8a']);
 fam('peach',      ['#ffab8a', '#ff9b7a', '#ffbfa0']);
 fam('peachDark',  ['#e8735a', '#d9634b']);
 fam('peachLight', ['#ffd3bf', '#ffe0d0']);
@@ -132,15 +132,15 @@ fam('zz',         ['#bfe3ff']);
 const FLASH = cidx('#ffffff');
 
 const SCHEME = {
-  pink:   { main: 'pink',   dark: 'pinkDark',   light: 'pinkLight',   stripe: 'pinkDark',    lip: 'maroon' },
-  white:  { main: 'white',  dark: 'whiteDark',  light: 'blush',       stripe: 'pink',        lip: 'pink' },
-  blush:  { main: 'blush',  dark: 'pink',       light: 'white',       stripe: 'pink',        lip: 'pink' },
-  maroon: { main: 'maroon', dark: 'maroonDark', light: 'maroonLight', stripe: 'maroonLight', lip: 'pink' },
-  peach:  { main: 'peach',  dark: 'peachDark',  light: 'peachLight',  stripe: 'peachDark',   lip: 'maroon' },
-  orchid: { main: 'orchid', dark: 'orchidDark', light: 'orchidLight', stripe: 'white',       lip: 'orchidDark' },
-  lilac:  { main: 'lilacF', dark: 'lilacDark',  light: 'lilacLight',  stripe: 'lilacDark',   lip: 'orchidDark' },
-  sky:    { main: 'hyd',    dark: 'hydDark',    light: 'sky',         stripe: 'hydDark',     lip: 'hydDark' },
-  sun:    { main: 'sunPetal', dark: 'sunPetalDark', light: 'gold',    stripe: 'sunPetalDark', lip: 'gold' },
+  pink:   { main: 'pink',   dark: 'pinkDark',   light: 'pinkLight',   stripe: 'pinkDark',    lip: 'maroon',     edge: 'pinkDark' },
+  white:  { main: 'white',  dark: 'whiteDark',  light: 'blush',       stripe: 'pink',        lip: 'pink',       edge: 'whiteDark' },
+  blush:  { main: 'blush',  dark: 'pink',       light: 'white',       stripe: 'pink',        lip: 'pink',       edge: 'pinkLight' },
+  maroon: { main: 'maroon', dark: 'maroonDark', light: 'maroonLight', stripe: 'maroonLight', lip: 'pink',       edge: 'maroonLight' },
+  peach:  { main: 'peach',  dark: 'peachDark',  light: 'peachLight',  stripe: 'peachDark',   lip: 'maroon',     edge: 'peachDark' },
+  orchid: { main: 'orchid', dark: 'orchidDark', light: 'orchidLight', stripe: 'white',       lip: 'orchidDark', edge: 'orchidDark' },
+  lilac:  { main: 'lilacF', dark: 'lilacDark',  light: 'lilacLight',  stripe: 'lilacDark',   lip: 'orchidDark', edge: 'lilacDark' },
+  sky:    { main: 'hyd',    dark: 'hydDark',    light: 'sky',         stripe: 'hydDark',     lip: 'hydDark',    edge: 'hydDark' },
+  sun:    { main: 'sunPetal', dark: 'sunPetalDark', light: 'gold',    stripe: 'sunPetalDark', lip: 'gold',      edge: 'sunPetalDark' },
 };
 const SCHEME_NAME = { pink: 'Pink', white: 'White', blush: 'Blush', maroon: 'Maroon', peach: 'Peach', orchid: 'Violet', lilac: 'Lilac', sky: 'Blue', sun: '' };
 const KIND_NAME = { rose: 'Rose', peony: 'Peony', ranunculus: 'Ranunculus', lily: 'Lily', orchid: 'Orchid', sunflower: 'Sunflower',
@@ -174,7 +174,7 @@ function sprite(ci, ch) {
     s = document.createElement('canvas'); s.width = s.height = SS;
     const g = s.getContext('2d');
     g.font = `${FPX}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = COLORS[ci]; g.shadowColor = COLORS[ci]; g.shadowBlur = 7;
+    g.fillStyle = COLORS[ci]; g.shadowColor = COLORS[ci]; g.shadowBlur = 4;
     g.fillText(ch, SS / 2, SS / 2 + 1);
     g.shadowBlur = 0; g.fillText(ch, SS / 2, SS / 2 + 1);
     SPR.set(key, s);
@@ -183,10 +183,10 @@ function sprite(ci, ch) {
 }
 
 /* ---------- constants ---------- */
-const SP = 4.6;          // flower glyph spacing (model units)
-const SPV = 5.6;         // vase spacing
-const SPS = 4.8;         // stem spacing
-const GSP = 7.5;         // garden flower spacing (garden is far bigger, so glyphs are coarser)
+const SP = 3.9;          // flower glyph spacing (model units)
+const SPV = 4.8;         // vase spacing
+const SPS = 4.0;         // stem spacing
+const GSP = 6.2;         // garden flower spacing (garden is far bigger, so glyphs are coarser)
 const SPR_K = SP * 1.05 * SS / FPX;
 const DCAM = 1100;
 const NB = 40;
@@ -278,8 +278,26 @@ function hexDisk(R, sp, fn) {
   for (let y = -R; y <= R; y += dy, row++) {
     const off = (row & 1) ? sp / 2 : 0;
     for (let x = -R - off; x <= R; x += sp)
-      fn(x + (Math.random() - .5) * sp * 0.2, y + (Math.random() - .5) * sp * 0.2);
+      fn(x + (Math.random() - .5) * sp * 0.08, y + (Math.random() - .5) * sp * 0.08);
   }
+}
+// Outline: glyphs on the outer contour of a flower (seen face-on) take the scheme's edge color,
+// so each silhouette reads clearly against the black.
+const OUTLINE_SKIP = { peony: 1, hydrangea: 1, tulip: 1 };
+function outline(pts, sp, c) {
+  const NS = 72, mx = new Float32Array(NS);
+  const sec = q => ((Math.atan2(q.y, q.x) / TAU + 1) * NS | 0) % NS;
+  for (const q of pts) if (q.gs === 'petal') { const s = sec(q), r = Math.hypot(q.x, q.y); if (r > mx[s]) mx[s] = r; }
+  for (const q of pts) if (q.gs === 'petal' && Math.hypot(q.x, q.y) > mx[sec(q)] - sp * 1.1) q.fam = c.edge;
+}
+// Lane-based petals: outermost lanes and the tip become edge-colored so each petal is separated.
+function petalLanes(w, step, u, L, c, base) {
+  const ln = lanes(w, step), out = [];
+  ln.forEach((v, j) => {
+    const edge = (ln.length >= 3 && (j === 0 || j === ln.length - 1)) || u + step > L;
+    out.push([v, edge ? c.edge : base]);
+  });
+  return out;
 }
 function lanes(w, step) { const n = Math.max(1, Math.round(2 * w / step) + 1); const out = []; for (let j = 0; j < n; j++) out.push(n === 1 ? 0 : -w + 2 * w * j / (n - 1)); return out; }
 
@@ -377,8 +395,8 @@ const GEN = {
       const a0 = k / np * TAU + Math.random() * 0.05, ca = Math.cos(a0), sa = Math.sin(a0);
       for (let u = 0.28; u <= 1.0; u += sp * 0.85) {
         const w = 0.1 * Math.sin(Math.PI * Math.min(1, (u - 0.2) / 0.85)) + 0.015;
-        for (const v of lanes(w, sp * 0.8))
-          o.push({ x: ca * u - sa * v, y: sa * u + ca * v, z: 0.05 - 0.12 * u * u, fam: u > 0.85 ? c.light : c.main, gs: 'petal', rn: u });
+        for (const [v, f] of petalLanes(w, sp * 0.8, u, 1.0, c, u > 0.85 ? c.light : c.main))
+          o.push({ x: ca * u - sa * v, y: sa * u + ca * v, z: 0.05 - 0.12 * u * u, fam: f, gs: 'petal', rn: u });
       }
     }
     hexDisk(0.26, sp, (x, y) => {
@@ -393,9 +411,9 @@ const GEN = {
       const a0 = k / 6 * TAU + (k % 2) * 0.12, ca = Math.cos(a0), sa = Math.sin(a0);
       for (let u = 0.05; u <= L; u += sp * 0.85) {
         const w = 0.3 * Math.pow(Math.sin(Math.PI * Math.min(1, u / L)), 0.8);
-        for (const v of lanes(w, sp * 0.85)) {
-          let f = Math.abs(v) < sp * 0.55 ? c.stripe : c.main;
-          if (u < 0.5 && Math.random() < 0.1) f = 'maroon';
+        for (const [v, ef] of petalLanes(w, sp * 0.85, u, L, c, c.main)) {
+          let f = Math.abs(v) < sp * 0.55 ? c.stripe : ef;
+          if (u < 0.5 && Math.random() < 0.1) f = c.main === 'maroon' ? 'pinkLight' : 'maroon';
           o.push({ x: ca * u - sa * v, y: sa * u + ca * v, z: 0.75 * u - 0.6 * u * u / L, fam: f, gs: 'petal', rn: u });
         }
       }
@@ -458,9 +476,9 @@ const GEN = {
       const a0 = k / np * TAU, ca = Math.cos(a0), sa = Math.sin(a0);
       for (let u = 0.17; u <= 1.0; u += sp * 0.85) {
         const w = 0.21 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - 0.08) / 0.96)), 0.5) * (0.6 + 0.4 * u);
-        for (const v of lanes(w, sp * 0.85)) {
+        for (const [v, f] of petalLanes(w, sp * 0.85, u, 1.0, c, u < 0.3 ? c.dark : c.main)) {
           if (u > 0.9 && Math.abs(Math.abs(v) - w * 0.5) < sp * 0.4) continue;   // notched tip
-          o.push({ x: ca * u - sa * v, y: sa * u + ca * v, z: 0.04 - 0.08 * u * u, fam: u < 0.3 ? c.dark : c.main, gs: 'petal', rn: u });
+          o.push({ x: ca * u - sa * v, y: sa * u + ca * v, z: 0.04 - 0.08 * u * u, fam: f, gs: 'petal', rn: u });
         }
       }
     }
@@ -478,9 +496,9 @@ const GEN = {
         const a0 = (k + L * 0.5) / np * TAU, ca = Math.cos(a0), sa = Math.sin(a0);
         for (let u = 0.05; u <= len; u += sp * 0.85) {
           const w = 0.17 * Math.pow(Math.sin(Math.PI * Math.min(1, u / len)), 0.7);
-          for (const v of lanes(w, sp * 0.85)) {
+          for (const [v, f] of petalLanes(w, sp * 0.85, u, len, c, u > len * 0.75 ? c.stripe : (L === 2 ? c.light : c.main))) {
             const rd = u * Math.cos(el);
-            o.push({ x: ca * rd - sa * v, y: sa * rd + ca * v, z: u * Math.sin(el), fam: u > len * 0.75 ? c.stripe : (L === 2 ? c.light : c.main), gs: 'petal', rn: u + L * 0.2 });
+            o.push({ x: ca * rd - sa * v, y: sa * rd + ca * v, z: u * Math.sin(el), fam: f, gs: 'petal', rn: u + L * 0.2 });
           }
         }
       }
@@ -494,17 +512,18 @@ const BASE_SIZE = { sunflower: 46, hydrangea: 42, peony: 38, lily: 36, cosmos: 3
 const TOPZ = { rose: .42, peony: .72, ranunculus: .55, lily: .35, orchid: .14, sunflower: .14, daisy: .14, tulip: .85,
   hydrangea: .82, carnation: .36, cosmos: .1, lotus: .5 };
 const KIND_SCHEMES = {
-  rose: ['pink', 'white', 'blush', 'maroon', 'pink', 'white'], peony: ['pink', 'white', 'blush'],
-  ranunculus: ['pink', 'white', 'peach', 'blush'], lily: ['white', 'pink', 'white'], orchid: ['white', 'pink', 'orchid'],
-  sunflower: ['sun'], daisy: ['white', 'white', 'pink'], tulip: ['pink', 'maroon', 'white', 'peach'],
-  hydrangea: ['white', 'sky', 'pink', 'lilac'], carnation: ['pink', 'white', 'maroon', 'blush'], cosmos: ['pink', 'white', 'maroon'],
-  lotus: ['pink', 'white'],
+  rose: ['pink', 'white', 'maroon', 'maroon', 'blush', 'pink', 'white', 'maroon'], peony: ['pink', 'white', 'blush', 'maroon'],
+  ranunculus: ['pink', 'white', 'peach', 'maroon', 'maroon'], lily: ['white', 'pink', 'white', 'maroon'], orchid: ['white', 'pink', 'orchid', 'maroon'],
+  sunflower: ['sun'], daisy: ['white', 'white', 'pink'], tulip: ['pink', 'maroon', 'maroon', 'white', 'peach'],
+  hydrangea: ['white', 'sky', 'pink', 'lilac', 'maroon'], carnation: ['pink', 'white', 'maroon', 'maroon', 'blush'],
+  cosmos: ['pink', 'white', 'maroon', 'maroon'], lotus: ['pink', 'white'],
 };
 const BOUQUET_W = { rose: 4, peony: 3, ranunculus: 3, carnation: 3, hydrangea: 2, lily: 2, cosmos: 2, orchid: 2, tulip: 2, daisy: 2, sunflower: 1 };
 const PRESET = [
-  ['rose', 'pink'], ['lily', 'white'], ['peony', 'blush'], ['ranunculus', 'pink'], ['hydrangea', 'white'],
-  ['carnation', 'white'], ['orchid', 'white'], ['cosmos', 'pink'], ['rose', 'white'], ['sunflower', 'sun'],
-  ['peony', 'pink'], ['tulip', 'maroon'], ['ranunculus', 'peach'], ['hydrangea', 'pink'], ['rose', 'maroon'],
+  ['rose', 'pink'], ['lily', 'white'], ['rose', 'maroon'], ['peony', 'blush'], ['ranunculus', 'maroon'],
+  ['hydrangea', 'white'], ['carnation', 'maroon'], ['orchid', 'white'], ['cosmos', 'pink'], ['peony', 'maroon'],
+  ['rose', 'white'], ['sunflower', 'sun'], ['tulip', 'maroon'], ['ranunculus', 'pink'], ['cosmos', 'maroon'],
+  ['peony', 'pink'], ['rose', 'maroon'], ['hydrangea', 'pink'], ['lily', 'maroon'], ['carnation', 'white'],
 ];
 function chooseFlower(i) {
   if (i < PRESET.length) return PRESET[i];
@@ -604,6 +623,7 @@ function stemLen(f) { return Math.hypot(f.tp.x - f.tb.x, f.tp.y - f.tb.y, f.tp.z
 function buildFlowerParts(f, b, sp, extra, garden, noLeaves) {
   f.base = f.size; f.gsp = sp * f.base;
   const pts = GEN[f.kind](sp, SCHEME[f.scheme]);
+  if (!OUTLINE_SKIP[f.kind]) outline(pts, sp, SCHEME[f.scheme]);
   for (const q of pts) {
     const p = P(f, Object.assign({ lx: q.x, ly: q.y, lz: q.z, fam: FAMS[q.fam], gs: G[q.gs] }, extra));
     p.delay = b + 0.6 + q.rn * 0.5 + rand(0.15);
@@ -773,6 +793,7 @@ function buildGarden(t0, ex, ey) {
   const specs = [];
   for (const [k, g] of Object.entries(GSPEC))
     for (let i = 0; i < g.n; i++) specs.push({ k, size: rand(...g.size), h: rand(...g.h), scheme: pick(KIND_SCHEMES[k]) });
+  for (let i = 0; i < 6; i++) specs.push({ k: 'rose', size: rand(24, 34), h: rand(80, 140), scheme: 'maroon' });   // extra maroon roses
   specs.sort((a, b) => b.size - a.size);
   const placed = [];
   for (const s of specs) {
@@ -792,7 +813,7 @@ function buildGarden(t0, ex, ey) {
     f.tp.x = x; f.tp.y = headY; f.tp.z = z; Object.assign(f.p, f.tp);
     f.tb.x = x; f.tb.y = baseY; f.tb.z = z;
     f.spinRate *= 0.3;
-    buildFlowerParts(f, wave(x, z), Math.max(GSP / size, 0.15), fly, true, noLeaves);
+    buildFlowerParts(f, wave(x, z), Math.max(GSP / size, 0.12), fly, true, noLeaves);
     gardenFlowers.push(f);
   };
   for (const s of specs) {
@@ -1249,7 +1270,7 @@ const BUCKETS = Array.from({ length: NB }, () => []);
 const O = v3();
 function render(dt) {
   ctx.globalAlpha = 1;
-  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.fillRect(0, 0, W, H);
   drawStars(dt);
 
