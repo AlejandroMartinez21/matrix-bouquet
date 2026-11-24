@@ -60,7 +60,7 @@ const MAXDPR = LOWQ ? 1.5 : 2;
 const TAP = IS_TOUCH ? 'tap' : 'click';
 const BACK_TXT = IS_TOUCH ? 'tap anywhere to return to the garden' : 'click anywhere or press Esc to return to the garden';
 document.getElementById('prompt').innerHTML = `&#10022; ${TAP} the bouquet &#10022;<div class="sub">${IS_TOUCH ? 'drag to turn it' : 'move your mouse to turn it'}</div>`;
-document.getElementById('ghint').textContent = `${TAP} any flower to take a closer look`;
+document.getElementById('ghint').textContent = `${TAP} any flower to take a closer look · drag to look around`;
 if (IS_TOUCH) document.getElementById('hint').style.display = 'none';
 
 let W, H, DPR, dprScale = 1;
@@ -843,14 +843,14 @@ const BEDS = [
   { x: 380,  z: -380, rx: 140, rz: 80,  kinds: ['rose', 'orchid', 'cosmos'] },
 ];
 const inBed = (x, z) => BEDS.some(b => ((x - b.x) / b.rx) ** 2 + ((z - b.z) / b.rz) ** 2 < 1);
-const BB = { x: -60, z: 60 };                     // birdbath
+const BB = { x: 150, z: 150 };                    // birdbath
 const ARCH = { x: pathX(0), z: 0 };               // rose arch over the path
-const CAT = { x: -190, z: 480, a: 1.05, s: 1.25 }; // where the cat loafs
+const CAT = { x: 0, z: 20, a: Math.PI / 2 - 0.35, s: 1.5 };   // the cat loafs right in the centre of the garden
 function blocked(x, z, r) {
   if (pondD(x, z) < 1.15 + r / PRZ) return true;
   if (Math.hypot(x - BB.x, z - BB.z) < 40 + r) return true;
   if (Math.hypot(x - ARCH.x, z - ARCH.z) < 70 + r) return true;
-  if (Math.hypot(x - CAT.x, z - CAT.z) < 60 + r) return true;
+  if (Math.hypot(x - CAT.x, z - CAT.z) < 85 + r) return true;
   if (Math.abs(x - pathX(z)) < 34 + r) return true;
   for (const [tx, tz] of TREES) if (Math.hypot(x - tx, z - tz) < 95 + r) return true;
   if (x > LAV.x0 - 20 - r && x < LAV.x1 + 20 + r && z > LAV.z0 - 20 - r && z < LAV.z1 + 20 + r) return true;
@@ -895,7 +895,9 @@ function explode() {
   setTimeout(() => { if (mode === 'garden' && !zf) $ghint.classList.add('show'); }, 7000);
 }
 // portrait screens crop the sides a little (the garden slowly turns, so everything still comes into view)
-function overviewS() { return Math.min(W * gcam.D / (W < H ? 1250 : 2150), H * gcam.D / 1250); }
+function overviewS() { return Math.min(W * gcam.D / (W < H ? 1250 : 2150), H * gcam.D / 1250) * gcam.zoomMul; }
+gcam.zoomMul = 1;      // user zoom (mouse wheel / pinch)
+let lastDrag = -10;    // pauses the slow auto-turn while the user is steering
 
 function buildGarden(t0, ex, ey) {
   gardenFlowers = [];
@@ -988,7 +990,7 @@ function buildGarden(t0, ex, ey) {
   // ---- grass blades ----
   for (let i = 0; i < Math.round(420 * QN); i++) {
     const a = rand(TAU), r = Math.sqrt(Math.random()) * 1.05, bx = Math.cos(a) * r * GX, bz = Math.sin(a) * r * GZ;
-    if (pondD(bx, bz) < 1.02 || Math.abs(bx - pathX(bz)) < 18 || inBed(bx, bz) || Math.hypot(bx - CAT.x, bz - CAT.z) < 45) continue;
+    if (pondD(bx, bz) < 1.02 || Math.abs(bx - pathX(bz)) < 18 || inBed(bx, bz) || Math.hypot(bx - CAT.x, bz - CAT.z) < 75) continue;
     const gy = hgt(bx, bz), h = rand(14, 44), la = rand(TAU), lean = rand(0.2, 0.6), k = Math.max(3, Math.ceil(h / 9));
     const fm = FAMS[pick(['green', 'leaf', 'fern', 'greenDark'])];
     for (let j = 0; j < k; j++) {
@@ -1073,7 +1075,7 @@ function buildGarden(t0, ex, ey) {
   // ---- tiny wildflowers ----
   for (let i = 0; i < 120; i++) {
     const a = rand(TAU), r = Math.sqrt(Math.random()) * 1.02, cx = Math.cos(a) * r * GX, cz = Math.sin(a) * r * GZ;
-    if (pondD(cx, cz) < 1.05) continue;
+    if (pondD(cx, cz) < 1.05 || Math.hypot(cx - CAT.x, cz - CAT.z) < 75) continue;
     const h = hgt(cx, cz) + rand(6, 18), fm = FAMS[pick(['white', 'white', 'pinkLight', 'lavenderF', 'gold', 'blush'])];
     for (let j = 0; j < 4; j++) add(cx + gauss() * 3, h + gauss() * 2, cz + gauss() * 3, { gs: G.filler, fam: fm, gm: 1.1, sw: 0.6 });
   }
@@ -1263,7 +1265,7 @@ function ellipsoidPts(cx, cy, cz, a, b, c, sp, fn) {
 }
 function buildCat(fly, wave) {
   const s = CAT.s, sp = 3.3 * QS;
-  const e = { type: 'cat', isCat: true, kind: 'cat', parts: [], s, size: 40, still: false,
+  const e = { type: 'cat', isCat: true, kind: 'cat', parts: [], s, size: 32 * s, still: false,
     fwd: v3(Math.cos(CAT.a), 0, Math.sin(CAT.a)), side: v3(-Math.sin(CAT.a), 0, Math.cos(CAT.a)),
     base: v3(CAT.x, hgt(CAT.x, CAT.z), CAT.z), eyes: [] };
   e.p = v3(e.base.x + e.fwd.x * 6 * s, e.base.y + 15 * s, e.base.z + e.fwd.z * 6 * s);
@@ -1274,6 +1276,12 @@ function buildCat(fly, wave) {
     const p = P(e, Object.assign({ lx: lx * s, ly: ly * s, lz: lz * s, gs: G.cat, fam: FAMS[fm], gm, part: 'body' }, fly, props));
     p.delay = d0 + rand(0.6); return p;
   };
+  // checkered picnic blanket under the cat
+  hexDisk(38, sp * 1.1, (x, z) => {
+    if (Math.hypot(x, z) > 38) return;
+    const chk = ((Math.floor((x + 40) / 9) + Math.floor((z + 40) / 9)) & 1);
+    add(x, 0.4, z, chk ? 'pinkLight' : 'white', { part: 'mat', gs: G.soft, gm: gm * 1.1, am: 0.8 });
+  });
   // the loaf: body tucked into a rounded bread shape
   ellipsoidPts(0, 11, 0, 22, 11, 13, sp, (x, y, z) => {
     if (y < 0.5) return;
@@ -1638,7 +1646,7 @@ function updateCamera(dt) {
     for (const key of CAMKEYS) cam[key] = gcam.from[key] + ((key === 'roll' ? 0 : gcam[key]) - gcam.from[key]) * u;
     return;
   }
-  if (!zf) gcam.yaw += 0.025 * dt;
+  if (!zf && T - lastDrag > 4) gcam.yaw += 0.025 * dt;
   const k = 1 - Math.exp(-dt * gcam.rate);
   cam.yaw += (gcam.yaw - cam.yaw) * k;
   cam.pitch += (gcam.pitch - cam.pitch) * k;
@@ -1834,13 +1842,52 @@ addEventListener('keydown', e => {
   else if (e.key === 'Escape') zoomOut();
 });
 // pointer events cover mouse, touch and pen; a tap is a press that barely moved (a drag just turns the bouquet)
-cv.addEventListener('pointermove', setPointer);
-cv.addEventListener('pointerdown', e => { setPointer(e); pointer.down = { x: e.clientX, y: e.clientY }; });
-cv.addEventListener('pointerup', e => {
-  const d = pointer.down; pointer.down = null;
-  if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 14) onTap(e.clientX, e.clientY);
+// In the garden: drag to orbit (left/right turns, up/down tilts), wheel or pinch to zoom.
+const touches = new Map();
+let pinchD = 0;
+const pinchDist = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+const canSteer = () => mode === 'garden' && T > gardenReadyAt;
+cv.addEventListener('pointermove', e => {
+  const px = pointer.x, py = pointer.y;
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2 && pinchD) {
+    const nd = pinchDist();
+    if (canSteer() && !zf) gcam.zoomMul = clamp(gcam.zoomMul * nd / pinchD, 0.7, 2.8);
+    pinchD = nd; if (pointer.down) pointer.down.drag = true;
+    return;
+  }
+  setPointer(e);
+  const d = pointer.down;
+  if (!d || !canSteer()) return;
+  if (!d.drag && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) d.drag = true;
+  if (d.drag) {
+    const dx = e.clientX - px, dy = e.clientY - py;
+    gcam.yaw += dx * 0.006; cam.yaw += dx * 0.006;
+    const np = clamp(gcam.pitch + dy * 0.004, zf ? 0.35 : 0.2, zf ? 1.4 : 1.25);
+    cam.pitch += np - gcam.pitch; gcam.pitch = np;
+    lastDrag = T;
+  }
 });
-cv.addEventListener('pointercancel', () => { pointer.down = null; });
+cv.addEventListener('pointerdown', e => {
+  setPointer(e);
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2) { pinchD = pinchDist(); if (pointer.down) pointer.down.drag = true; return; }
+  pointer.down = { x: e.clientX, y: e.clientY, drag: false };
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+});
+function endPointer(e, isUp) {
+  touches.delete(e.pointerId); if (touches.size < 2) pinchD = 0;
+  const d = pointer.down;
+  if (touches.size === 0) pointer.down = null;
+  if (isUp && d && !d.drag && touches.size === 0 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 14) onTap(e.clientX, e.clientY);
+}
+cv.addEventListener('pointerup', e => endPointer(e, true));
+cv.addEventListener('pointercancel', e => endPointer(e, false));
+cv.addEventListener('wheel', e => {
+  if (!canSteer() || zf) return;
+  e.preventDefault();
+  gcam.zoomMul = clamp(gcam.zoomMul * (1 - e.deltaY * 0.0012), 0.7, 2.8);
+}, { passive: false });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('visibilitychange', () => { last = performance.now() / 1000; });
 addEventListener('resize', resize);
