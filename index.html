@@ -129,6 +129,25 @@ fam('beeLeg',     ['#8a5a2a']);
 fam('wing',       ['#e8f7ff']);
 fam('pollen',     ['#ff9a1a']);
 fam('zz',         ['#bfe3ff']);
+// bouquet greenery
+fam('euc',        ['#8fc9b0', '#a3d6c0', '#7bb89e']);
+fam('eucDark',    ['#5f9c84']);
+// garden structure
+fam('brick',      ['#d9976f', '#c98a6a', '#e3a884']);
+fam('soilBed',    ['#6b4a32', '#5e4029', '#76533a']);
+fam('picket',     ['#fff6ea', '#f3e9da', '#ffffff']);
+// critters
+fam('dark',       ['#5a3a3a']);
+fam('ladybug',    ['#ff2d2d', '#ff3d3d']);
+fam('dragon',     ['#3fe0d0', '#4aa8f0']);
+fam('snailShell', ['#d9a066', '#c98a50']);
+fam('snailBody',  ['#d8e0a8']);
+// the cat
+fam('catOrange',  ['#ffb066', '#ffa552', '#ffbb7a']);
+fam('catStripe',  ['#e0803a', '#d47530']);
+fam('catWhite',   ['#fff3e6', '#ffffff']);
+fam('catPink',    ['#ff9bb8']);
+fam('catEye',     ['#7a4a20']);
 const FLASH = cidx('#ffffff');
 
 const SCHEME = {
@@ -162,6 +181,9 @@ const G = {
   stone:  Array.from('o0O@'),
   bark:   Array.from('|#H%¦'),
   blossom:Array.from('*+@%&°ﾊﾐ'),
+  cat:    Array.from('ﾈｺ=~#*%@'),
+  fence:  Array.from('|!I'),
+  rail:   ['-', '='],
 };
 
 /* ---------- glyph sprites (glow baked in) ---------- */
@@ -192,6 +214,7 @@ const DCAM = 1100;
 const NB = 40;
 const COUNTS = [1, 3, 5, 8, 11, 15, 19, 24, 29, 35];
 const FILL   = [0, 2, 4, 6, 9, 12, 15, 19, 23, 28];
+const SPRIGS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];      // non-flower greenery in the bouquet
 
 /* ---------- soft containers (surface-of-revolution profiles: [height, radius]) ---------- */
 function dotPat(h, a, r, cell, rad) {
@@ -539,7 +562,7 @@ const ACTS = [
 ];
 
 /* ---------- world state ---------- */
-let particles = [], elements = [], flowers = [], fillers = [], gardenFlowers = [];
+let particles = [], elements = [], flowers = [], fillers = [], gardenFlowers = [], sprigs = [], critters = [], catEl = null;
 let vaseEl = null, stage = -1, stageEnd = 0;
 let mode = 'grow';                    // grow | await | garden
 let gardenReadyAt = 0, flashT = -10, zf = null, zoomEls = [];
@@ -605,14 +628,15 @@ function resizeStem(e, len, b, extra, spc) {
   e.parts.forEach((p, j) => { p.tt = j / (m - 1); if (j >= old) p.t = p.tt; });
 }
 
-function buildLeaf(stem, b, extra, L, t0, spc) {
-  const e = { type: 'leaf', stem, t0, az: rand(TAU), S: v3(), D: v3(), Sd: v3(), parts: [] };
+function buildLeaf(stem, b, extra, L, t0, spc, o) {
+  o = o || {};
+  const e = { type: 'leaf', stem, t0, az: o.az !== undefined ? o.az : rand(TAU), S: v3(), D: v3(), Sd: v3(), parts: [] };
   elements.push(e);
-  const step = spc || SP * 0.9;
-  for (let u = 2; u <= L; u += step) {
-    const w = Math.sin(Math.PI * u / L) * L * 0.22;
+  const step = spc || SP * 0.9, rd = o.round || 0.22, fm = o.fam || 'leaf', mid = o.mid || 'greenDark';
+  for (let u = Math.min(2, step * 0.6); u <= L; u += step) {
+    const w = Math.sin(Math.PI * u / L) * L * rd;
     for (const v of lanes(w, step)) {
-      const p = P(e, Object.assign({ lx: u, ly: v, gs: G.leaf, fam: FAMS[Math.abs(v) < step * 0.45 ? 'greenDark' : 'leaf'], gm: step / SP }, extra));
+      const p = P(e, Object.assign({ lx: u, ly: v, gs: G.leaf, fam: FAMS[Math.abs(v) < step * 0.45 ? mid : fm], gm: step / SP }, extra));
       p.delay = b + u / L * 0.4 + rand(0.12);
     }
   }
@@ -654,6 +678,40 @@ function makeFiller(b) {
   return e;
 }
 
+/* ---------- bouquet greenery: eucalyptus, fern, leafy sprays, berry sprigs ---------- */
+function makeSprig() {
+  const f = makeFlowerEl('sprig', 'white', 10);
+  f.sk = pick(['euc', 'euc', 'fern', 'ruscus', 'berries']);
+  f.tf = rand(0.8, 1.08); f.ph2 = rand(TAU); f.rOff = rand(10, 30); f.spinRate = 0;
+  sprigs.push(f); return f;
+}
+function buildSprigParts(f, b) {
+  f.base = f.size; f.gsp = SP;
+  const st = { type: 'stem', f, b: copy3(f.tb), tb: f.tb, parts: [], B: v3(), C1: v3(), C2: v3(), E: v3() };
+  f.stem = st; elements.push(st);
+  resizeStem(st, stemLen(f), b);
+  const az0 = rand(TAU);
+  if (f.sk === 'euc')
+    for (let i = 0; i < 8; i++) buildLeaf(st, b + 0.3 + i * 0.05, null, rand(9, 12), 0.35 + i * 0.085, SP * 0.8, { round: 0.42, fam: 'euc', mid: 'eucDark', az: az0 + i * 2.4 });
+  else if (f.sk === 'fern')
+    for (let i = 0; i < 14; i++) buildLeaf(st, b + 0.3 + i * 0.04, null, 18 * (1 - i / 16) + 5, 0.3 + i * 0.05, SP * 0.8, { round: 0.14, fam: 'fern', mid: 'greenDark', az: az0 + (i % 2) * Math.PI });
+  else if (f.sk === 'ruscus')
+    for (let i = 0; i < 6; i++) buildLeaf(st, b + 0.3 + i * 0.06, null, rand(14, 18), 0.4 + i * 0.1, SP * 0.85, { round: 0.25, fam: 'leaf', mid: 'greenDark', az: az0 + i * 2.1 });
+  else {
+    for (let i = 0; i < 3; i++) buildLeaf(st, b + 0.3 + i * 0.06, null, rand(12, 16), 0.5 + i * 0.12, SP * 0.85, { az: az0 + i * 2.1 });
+    const bf = pick(['maroon', 'maroon', 'pinkLight', 'white']);
+    for (let i = 0; i < 11; i++) {
+      const p = P(f, { lx: gauss() * 0.5, ly: gauss() * 0.5, lz: Math.abs(gauss()) * 0.5, gs: ['o', '0', '@'], fam: FAMS[bf] });
+      p.delay = b + 0.8 + rand(0.3);
+    }
+  }
+}
+function setBase(f, def) {
+  if (def.mound) { f.tb.x = 0; f.tb.y = 8; f.tb.z = 0; }
+  else if (def.wrap) { f.tb.x = f.bo.x * 7; f.tb.y = -58; f.tb.z = f.bo.y * 7; }
+  else { f.tb.x = f.bo.x * def.mouthR * 0.45; f.tb.y = def.mouthH * 0.42; f.tb.z = f.bo.y * def.mouthR * 0.45; }
+}
+
 function layout(s) {
   const def = VASES[s], N = flowers.length;
   const Rd = N === 1 ? 0 : 22 + 30 * Math.sqrt(N);
@@ -670,13 +728,20 @@ function layout(s) {
     const n = N === 1 ? v3(0, 0.5, 0.87) : v3(dx * 1.4, dy * 0.7 + 0.25, dz * 1.4);
     Object.assign(f.tn, norm(n));
     f.tsize = f.kbase * mult;
-    if (def.mound) { f.tb.x = 0; f.tb.y = 8; f.tb.z = 0; }
-    else if (def.wrap) { f.tb.x = f.bo.x * 7; f.tb.y = -58; f.tb.z = f.bo.y * 7; }
-    else { f.tb.x = f.bo.x * def.mouthR * 0.45; f.tb.y = def.mouthH * 0.42; f.tb.z = f.bo.y * def.mouthR * 0.45; }
+    setBase(f, def);
   });
   fillers.forEach(fl => {
     const R = Math.max(Rd, 34) + fl.rOff;
     fl.tp.x = fl.d.x * R; fl.tp.y = cy + fl.d.y * R * 0.7; fl.tp.z = fl.d.z * R;
+  });
+  const thS = Math.max(thMax, 0.95);
+  sprigs.forEach(sg => {
+    const th = sg.tf * thS, dx = Math.sin(th) * Math.cos(sg.ph2), dy = Math.cos(th), dz = Math.sin(th) * Math.sin(sg.ph2);
+    const R = Math.max(Rd, 30) + sg.rOff;
+    sg.tp.x = dx * R; sg.tp.y = cy + dy * R * 0.7; sg.tp.z = dz * R;
+    Object.assign(sg.tn, norm(v3(dx * 1.6, dy * 0.4 + 0.15, dz * 1.6)));
+    sg.tsize = 10;
+    setBase(sg, def);
   });
   cam.tTop = cy + Rd * 0.75 + 62;
   cam.tBot = def.wrap ? -72 : -10;
@@ -706,13 +771,16 @@ function startStage(s) {
   const fillStart = cursor + newF.length * step + 0.4;
   const newFill = [];
   while (fillers.length < FILL[s]) newFill.push(makeFiller(fillStart + rand(1.0)));
+  const newS = [];
+  while (sprigs.length < SPRIGS[s]) newS.push(makeSprig());
 
   layout(s);
-  for (const f of newF) { Object.assign(f.p, f.tp); Object.assign(f.n0, f.tn); f.size = f.tsize; }
+  for (const f of newF.concat(newS)) { Object.assign(f.p, f.tp); Object.assign(f.n0, f.tn); f.size = f.tsize; }
   for (const fl of newFill) Object.assign(fl.p, fl.tp);
 
-  for (const f of flowers) if (f.stem) resizeStem(f.stem, stemLen(f), t0 + rand(0.4, 1.4));
+  for (const f of flowers.concat(sprigs)) if (f.stem) resizeStem(f.stem, stemLen(f), t0 + rand(0.4, 1.4));
   newF.forEach((f, i) => buildFlowerParts(f, cursor + i * step, SP / f.size));
+  newS.forEach((sg, i) => buildSprigParts(sg, cursor + 0.2 + i * 0.25));
 
   stageEnd = fillStart + 1.6 + (s === 0 ? 2.5 : s === VASES.length - 1 ? 3 : 1.4);
 }
@@ -728,7 +796,7 @@ function enterAwait() {
 const GX = 1000, GZ = 650;
 const PX = -430, PZ = 170, PRX = 200, PRZ = 115;              // pond
 const TREES = [[-860, -380], [-140, -560], [620, -480], [900, 220]];
-const LAV = { x0: 330, x1: 640, z0: 90, z1: 330 };             // lavender rows
+const LAV = { x0: 400, x1: 660, z0: 90, z1: 300 };             // lavender rows
 function baseH(x, z) {
   return 16 * Math.sin(x * 0.0032 + 0.7) * Math.cos(z * 0.004 - 0.3) + 10 * Math.sin(x * 0.008 + z * 0.005)
     + 95 * Math.pow(clamp((-z - 360) / 340, 0, 1), 1.6);
@@ -737,8 +805,26 @@ const WL = baseH(PX, PZ) - 2;
 const pondD = (x, z) => Math.sqrt(((x - PX) / PRX) ** 2 + ((z - PZ) / PRZ) ** 2);
 function hgt(x, z) { const b = baseH(x, z), w = smooth(clamp((1.3 - pondD(x, z)) / 0.4, 0, 1)); return b * (1 - w) + (WL - 7) * w; }
 const pathX = z => 160 * Math.sin(z * 0.0045 + 0.8) + 180;
+// bordered flower beds, each planted with a few kinds so the garden reads as designed
+const BEDS = [
+  { x: -650, z: -150, rx: 170, rz: 100, kinds: ['rose', 'rose', 'peony', 'carnation'] },
+  { x: -200, z: -250, rx: 160, rz: 95,  kinds: ['sunflower', 'cosmos', 'lily'] },
+  { x: -30,  z: 330,  rx: 140, rz: 100, kinds: ['tulip', 'daisy', 'ranunculus'] },
+  { x: 620,  z: -150, rx: 170, rz: 100, kinds: ['hydrangea', 'rose', 'orchid'] },
+  { x: 650,  z: 420,  rx: 130, rz: 80,  kinds: ['carnation', 'ranunculus', 'daisy'] },
+  { x: -600, z: 430,  rx: 150, rz: 90,  kinds: ['peony', 'tulip', 'cosmos'] },
+  { x: -450, z: -480, rx: 160, rz: 80,  kinds: ['sunflower', 'lily', 'hydrangea'] },
+  { x: 380,  z: -380, rx: 140, rz: 80,  kinds: ['rose', 'orchid', 'cosmos'] },
+];
+const inBed = (x, z) => BEDS.some(b => ((x - b.x) / b.rx) ** 2 + ((z - b.z) / b.rz) ** 2 < 1);
+const BB = { x: -60, z: 60 };                     // birdbath
+const ARCH = { x: pathX(0), z: 0 };               // rose arch over the path
+const CAT = { x: -190, z: 480, a: 1.05, s: 1.25 }; // where the cat loafs
 function blocked(x, z, r) {
   if (pondD(x, z) < 1.15 + r / PRZ) return true;
+  if (Math.hypot(x - BB.x, z - BB.z) < 40 + r) return true;
+  if (Math.hypot(x - ARCH.x, z - ARCH.z) < 70 + r) return true;
+  if (Math.hypot(x - CAT.x, z - CAT.z) < 60 + r) return true;
   if (Math.abs(x - pathX(z)) < 34 + r) return true;
   for (const [tx, tz] of TREES) if (Math.hypot(x - tx, z - tz) < 95 + r) return true;
   if (x > LAV.x0 - 20 - r && x < LAV.x1 + 20 + r && z > LAV.z0 - 20 - r && z < LAV.z1 + 20 + r) return true;
@@ -772,7 +858,7 @@ function explode() {
     p.vx = dx / l * sp + gauss() * 40; p.vy = dy / l * sp - rand(40, 140); p.g = 90; p.fade = rand(2.2, 3.6);
   }
   for (const e of elements) e.dying = true;
-  flowers = []; fillers = []; vaseEl = null;
+  flowers = []; fillers = []; sprigs = []; vaseEl = null;
   // scripted, eased camera glide from the bouquet view to the garden overview
   gcam.from = {}; for (const k of CAMKEYS) gcam.from[k] = cam[k];
   Object.assign(gcam, { yaw: cam.yaw, pitch: 0.58, roll: 0, tx: 0, ty: 50, tz: 60, D: 2400, half: 1000, rate: 1.2,
@@ -790,23 +876,28 @@ function buildGarden(t0, ex, ey) {
   const fly = { fly: true, ox: ex, oy: ey };
 
   // ---- flowers ----
-  const specs = [];
-  for (const [k, g] of Object.entries(GSPEC))
-    for (let i = 0; i < g.n; i++) specs.push({ k, size: rand(...g.size), h: rand(...g.h), scheme: pick(KIND_SCHEMES[k]) });
-  for (let i = 0; i < 6; i++) specs.push({ k: 'rose', size: rand(24, 34), h: rand(80, 140), scheme: 'maroon' });   // extra maroon roses
-  specs.sort((a, b) => b.size - a.size);
-  const placed = [];
-  for (const s of specs) {
-    s.skip = true;
-    for (let tries = 0; tries < 140; tries++) {
-      const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.95, x = Math.cos(a) * r * GX, z = Math.sin(a) * r * GZ;
-      if (s.k === 'sunflower' && z > 120) continue;
-      if (blocked(x, z, s.size * 0.6)) continue;
-      if (placed.every(q => Math.hypot(q.x - x, q.z - z) > (q.size + s.size) * 0.85 + 6)) {
-        placed.push({ x, z, size: s.size }); s.x = x; s.z = z; s.skip = false; break;
+  const specs = [], placed = [];
+  const tryPlace = (s, sampler, tries) => {
+    for (let t = 0; t < tries; t++) {
+      const [x, z] = sampler();
+      if (blocked(x, z, s.size * 0.5)) continue;
+      if (placed.every(q => Math.hypot(q.x - x, q.z - z) > (q.size + s.size) * 0.8 + 4)) {
+        placed.push({ x, z, size: s.size }); s.x = x; s.z = z; specs.push(s); return true;
       }
     }
+    return false;
+  };
+  const mkSpec = k => { const g = GSPEC[k]; return { k, size: rand(...g.size), h: rand(...g.h), scheme: pick(KIND_SCHEMES[k]) }; };
+  for (const bed of BEDS) {
+    const samp = () => { const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.88; return [bed.x + Math.cos(a) * r * bed.rx, bed.z + Math.sin(a) * r * bed.rz]; };
+    const list = [];
+    for (let i = 0; i < 26; i++) list.push(mkSpec(pick(bed.kinds)));
+    list.sort((a, b) => b.size - a.size);
+    let n = 0;
+    for (const s of list) { if (n >= 17) break; if (tryPlace(s, samp, 40)) n++; }
   }
+  for (let i = 0; i < 14; i++)   // a few wildflowers dotted on the lawn
+    tryPlace(mkSpec(pick(['daisy', 'daisy', 'cosmos', 'tulip'])), () => { const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.92; return [Math.cos(a) * r * GX, Math.sin(a) * r * GZ]; }, 30);
   const addFlower = (k, scheme, size, x, z, headY, baseY, n, noLeaves) => {
     const f = makeFlowerEl(k, scheme, size);
     Object.assign(f.tn, n); Object.assign(f.n0, n);
@@ -864,13 +955,13 @@ function buildGarden(t0, ex, ey) {
   // ---- ground cover (follows the rolling hills) ----
   for (let x = -GX * 1.1; x <= GX * 1.1; x += 32) for (let z = -GZ * 1.1; z <= GZ * 1.1; z += 32) {
     const jx = x + rand(-11, 11), jz = z + rand(-11, 11);
-    if (!inEll(jx, jz, 1.1) || pondD(jx, jz) < 1.0) continue;
-    add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.ground, gm: 1.5, am: 0.55 });
+    if (!inEll(jx, jz, 1.1) || pondD(jx, jz) < 1.0 || inBed(jx, jz)) continue;
+    add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.ground, gm: 1.5, am: 0.5 });
   }
   // ---- grass blades ----
-  for (let i = 0; i < 520; i++) {
+  for (let i = 0; i < 420; i++) {
     const a = rand(TAU), r = Math.sqrt(Math.random()) * 1.05, bx = Math.cos(a) * r * GX, bz = Math.sin(a) * r * GZ;
-    if (pondD(bx, bz) < 1.02 || Math.abs(bx - pathX(bz)) < 18) continue;
+    if (pondD(bx, bz) < 1.02 || Math.abs(bx - pathX(bz)) < 18 || inBed(bx, bz) || Math.hypot(bx - CAT.x, bz - CAT.z) < 45) continue;
     const gy = hgt(bx, bz), h = rand(14, 44), la = rand(TAU), lean = rand(0.2, 0.6), k = Math.max(3, Math.ceil(h / 9));
     const fm = FAMS[pick(['green', 'leaf', 'fern', 'greenDark'])];
     for (let j = 0; j < k; j++) {
@@ -959,6 +1050,240 @@ function buildGarden(t0, ex, ey) {
     const h = hgt(cx, cz) + rand(6, 18), fm = FAMS[pick(['white', 'white', 'pinkLight', 'lavenderF', 'gold', 'blush'])];
     for (let j = 0; j < 4; j++) add(cx + gauss() * 3, h + gauss() * 2, cz + gauss() * 3, { gs: G.filler, fam: fm, gm: 1.1, sw: 0.6 });
   }
+  buildGardenExtras(add, wave, fly);
+}
+
+/* ---------- garden structure: bed borders, fence, rose arch, birdbath ---------- */
+function buildGardenExtras(add, wave, fly) {
+  for (const bed of BEDS) {
+    // tilled soil inside each bed
+    for (let x = bed.x - bed.rx; x <= bed.x + bed.rx; x += 17) for (let z = bed.z - bed.rz; z <= bed.z + bed.rz; z += 17) {
+      const jx = x + rand(-5, 5), jz = z + rand(-5, 5);
+      if (((jx - bed.x) / bed.rx) ** 2 + ((jz - bed.z) / bed.rz) ** 2 > 0.92) continue;
+      add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.soilBed, gm: 1.4, am: 0.7 });
+    }
+    // brick border
+    const per = TAU * Math.sqrt((bed.rx ** 2 + bed.rz ** 2) / 2), n = Math.round(per / 6.5);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU, x = bed.x + Math.cos(a) * bed.rx, z = bed.z + Math.sin(a) * bed.rz;
+      add(x, hgt(x, z) + 2, z, { gs: G.stone, fam: FAMS.brick, gm: 1.3 });
+    }
+  }
+  // white picket fence around the back and sides (front left open for the view)
+  for (let i = 0, n = 640; i < n; i++) {
+    const a = i / n * TAU; if (Math.sin(a) > 0.35) continue;
+    const x = Math.cos(a) * GX * 1.1, z = Math.sin(a) * GZ * 1.1, gy = hgt(x, z);
+    if (i % 3 === 0) for (let y = 0; y <= 40; y += 5) add(x, gy + y, z, { gs: y > 36 ? ['^'] : G.fence, fam: FAMS.picket, gm: 1.2 });
+    add(x, gy + 13, z, { gs: G.rail, fam: FAMS.picket, gm: 1.1 });
+    add(x, gy + 29, z, { gs: G.rail, fam: FAMS.picket, gm: 1.1 });
+  }
+  // rose arch over the path
+  {
+    const cx = ARCH.x, cz = ARCH.z, w = 40, hh = 70, gy = hgt(cx, cz);
+    for (const side of [-1, 1]) for (let y = 0; y < hh; y += 5) for (const dz of [-4, 4]) add(cx + side * w, gy + y, cz + dz, { gs: G.fence, fam: FAMS.picket, gm: 1.2 });
+    for (let a = 0; a <= Math.PI; a += 0.07) for (const dz of [-4, 4]) add(cx + Math.cos(a) * w, gy + hh + Math.sin(a) * w * 0.8, cz + dz, { gs: G.rail, fam: FAMS.picket, gm: 1.2 });
+    for (let i = 0; i < 150; i++) {
+      let x, y;
+      if (Math.random() < 0.55) { const a = rand(Math.PI); x = cx + Math.cos(a) * w; y = gy + hh + Math.sin(a) * w * 0.8; }
+      else { x = cx + (Math.random() < .5 ? -w : w); y = gy + rand(10, hh); }
+      const fl = Math.random() < 0.4;
+      add(x + gauss() * 3, y + gauss() * 3, cz + gauss() * 5, { gs: fl ? G.blossom : G.leaf,
+        fam: FAMS[fl ? pick(['pink', 'white', 'maroon', 'pinkLight']) : pick(['leaf', 'green'])], gm: 1.2, sw: 0.2 });
+    }
+  }
+  // birdbath
+  {
+    const gy = hgt(BB.x, BB.z);
+    for (let y = 0; y < 30; y += 4.5) for (let k = 0; k < 6; k++) {
+      const a = k / 6 * TAU, r = y < 4 ? 10 : 5;
+      add(BB.x + Math.cos(a) * r, gy + y, BB.z + Math.sin(a) * r, { gs: G.stone, fam: FAMS.stone, gm: 1.1 });
+    }
+    for (let ring = 0; ring < 3; ring++) {
+      const r = 10 + ring * 5, y = gy + 30 + ring * 2.5, n = Math.round(TAU * r / 5);
+      for (let k = 0; k < n; k++) { const a = k / n * TAU; add(BB.x + Math.cos(a) * r, y, BB.z + Math.sin(a) * r, { gs: G.stone, fam: FAMS.stone, gm: 1.1 }); }
+    }
+    hexDisk(17, 5, (dx, dz) => { if (Math.hypot(dx, dz) < 17) add(BB.x + dx, gy + 34, BB.z + dz, { gs: G.water, fam: FAMS.water, gm: 1.1, am: 0.8 }); });
+  }
+  buildCritters(fly, wave);
+  buildCat(fly, wave);
+}
+
+/* ---------- critters: butterflies, bees, dragonflies, ladybugs, snails ---------- */
+let hopTargets = [];
+const BFLY = [['pink', 'pinkLight'], ['white', 'blush'], ['hyd', 'sky'], ['sunPetal', 'gold'], ['peach', 'peachLight'], ['orchidLight', 'white']];
+function critter(kind, bs, fly, delay) {
+  const e = { type: 'critter', kind, bs, pos: v3(), F: v3(1, 0, 0), S: v3(0, 0, 1), h: rand(TAU), parts: [], wings: [],
+    ph: rand(TAU), state: 'rest', until: 0, extra: fly, delay, ox: 0, oz: 0 };
+  elements.push(e); critters.push(e); return e;
+}
+function cpart(e, lx, ly, lz, ch, fm, extra) {
+  const p = P(e, Object.assign({ lx: lx * e.bs, ly: ly * e.bs, lz: lz * e.bs, ch, gs: [ch], fam: FAMS[fm], fixed: true, gm: e.bs * 1.1 / (SP * 1.05) }, e.extra, extra));
+  p.delay = e.delay; return p;
+}
+function buildCritters(fly, wave) {
+  hopTargets = gardenFlowers.filter(f => f.kind !== 'lotus');
+  const hopper = (kind, bs, speed, r0, r1) => {
+    const f = pick(hopTargets), e = critter(kind, bs, fly, wave(f.p.x, f.p.z) + 1.5);
+    e.target = f; e.speed = speed; e.r0 = r0; e.r1 = r1; e.until = rand(1, 4);
+    e.pos.x = f.p.x; e.pos.y = f.p.y + TOPZ[f.kind] * f.size + 2; e.pos.z = f.p.z;
+    return e;
+  };
+  for (let i = 0; i < 10; i++) {                       // butterflies
+    const pal = pick(BFLY), e = hopper('butterfly', 3.2, rand(28, 40), 2, 6);
+    cpart(e, 0.9, 0, 0, 'o', 'dark'); cpart(e, 0, 0, 0, '|', 'dark'); cpart(e, -0.9, 0, 0, '|', 'dark');
+    cpart(e, 1.6, 0.5, 0.4, "'", 'dark'); cpart(e, 1.6, -0.5, 0.4, '`', 'dark');
+    for (const [wx, wy, ch, k] of [[0.5, 1.1, '@', 0], [0.7, 2.0, '%', 0], [0.2, 2.6, '*', 1], [-0.6, 1.0, '@', 0], [-0.8, 1.7, '*', 1]])
+      for (const sd of [1, -1]) { const w = cpart(e, wx, wy * sd, 0, ch, pal[k]); w.wy = wy * sd; e.wings.push(w); }
+  }
+  for (let i = 0; i < 8; i++) {                        // garden bees
+    const e = hopper('gbee', 2.2, rand(45, 70), 1.5, 4);
+    cpart(e, 0.9, 0, 0, 'o', 'beeHead'); cpart(e, 0.2, 0, 0, '#', 'beeFuzz'); cpart(e, -0.5, 0, 0, '=', 'bee');
+    cpart(e, -1.1, 0, 0, '=', 'beeStripe'); cpart(e, -1.6, 0, 0, '=', 'bee');
+    for (const sd of [1, -1]) { const w = cpart(e, 0.2, sd, 0.8, '^', 'wing', { am: 0.55 }); e.wings.push(w); }
+  }
+  for (let i = 0; i < 3; i++) {                        // dragonflies over the pond
+    const e = critter('dragonfly', 2.4, fly, wave(PX, PZ) + 2);
+    const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.8;
+    e.pos = v3(PX + Math.cos(a) * r * PRX, WL + rand(14, 34), PZ + Math.sin(a) * r * PRZ);
+    e.from = copy3(e.pos); e.to = copy3(e.pos); e.t0 = 0; e.next = rand(1, 3);
+    cpart(e, 2.2, 0, 0, 'o', 'dragon');
+    for (let x = 1.4; x > -4.3; x -= 0.7) cpart(e, x, 0, 0, '=', 'dragon');
+    for (const [wx, wy] of [[0.9, 2.2], [0.9, -2.2], [0.1, 2.0], [0.1, -2.0]]) e.wings.push(cpart(e, wx, wy, 0.2, '-', 'wing', { am: 0.5 }));
+  }
+  for (let i = 0; i < 8; i++) {                        // ladybugs strolling on petals
+    const f = pick(hopTargets), e = critter('ladybug', 2.0, fly, wave(f.p.x, f.p.z) + 1.8);
+    e.target = f; e.a = rand(TAU);
+    cpart(e, 0.7, 0, 0.1, 'o', 'dark'); cpart(e, 0, 0, 0.3, '@', 'ladybug'); cpart(e, -0.5, 0, 0.25, '@', 'ladybug');
+    cpart(e, -0.2, 0.35, 0.5, '.', 'dark'); cpart(e, -0.2, -0.35, 0.5, '.', 'dark');
+  }
+  for (let i = 0; i < 2; i++) {                        // snails crossing the path
+    const z = rand(-200, 400), x = pathX(z) + rand(-50, 50), e = critter('snail', 2.6, fly, wave(x, z) + 2);
+    e.pos = v3(x, hgt(x, z) + 0.5, z); e.h = Math.random() < 0.5 ? 0 : Math.PI; e.dist = rand(80); e.len = rand(80, 140);
+    cpart(e, 0, 0, 1.4, '@', 'snailShell'); cpart(e, -0.2, 0, 2.3, 'o', 'snailShell');
+    cpart(e, 1.2, 0, 0.3, '~', 'snailBody'); cpart(e, 0.4, 0, 0.2, '_', 'snailBody'); cpart(e, -1.0, 0, 0.2, '_', 'snailBody');
+    cpart(e, 1.9, 0.3, 1.2, "'", 'snailBody'); cpart(e, 1.9, -0.3, 1.2, "'", 'snailBody');
+  }
+}
+function updCritter(e, dt) {
+  switch (e.kind) {
+    case 'butterfly': case 'gbee': {
+      const f = e.target, top = f.p.y + TOPZ[f.kind] * f.size + 2;
+      if (e.state === 'rest') {
+        e.pos.x = f.p.x + e.ox; e.pos.y = top; e.pos.z = f.p.z + e.oz;
+        if (T > e.until) {
+          const near = hopTargets.filter(g => g !== f && Math.hypot(g.p.x - f.p.x, g.p.z - f.p.z) < 420);
+          e.target = near.length ? pick(near) : pick(hopTargets);
+          e.ox = gauss() * e.target.size * 0.15; e.oz = gauss() * e.target.size * 0.15; e.state = 'fly';
+        }
+      } else {
+        const tx = f.p.x + e.ox, tz = f.p.z + e.oz, dx = tx - e.pos.x, dz = tz - e.pos.z, hd = Math.hypot(dx, dz);
+        const ty = top + Math.min(hd * 0.35, 90), dy = ty - e.pos.y, d = Math.hypot(dx, dy, dz) || 1;
+        if (hd < 3 && Math.abs(top - e.pos.y) < 3) { e.state = 'rest'; e.until = T + rand(e.r0, e.r1); }
+        else {
+          const step = Math.min(d, e.speed * dt);
+          e.pos.x += dx / d * step; e.pos.z += dz / d * step;
+          e.pos.y += dy / d * step + Math.sin(T * (e.kind === 'butterfly' ? 5 : 9) + e.ph) * (e.kind === 'butterfly' ? 14 : 5) * dt;
+          if (hd > 1) e.h = Math.atan2(dz, dx) + Math.sin(T * 3 + e.ph) * (e.kind === 'butterfly' ? 0.35 : 0.1);
+        }
+      }
+      if (e.kind === 'butterfly') {
+        const ang = e.state === 'fly' ? 0.25 + 1.1 * (0.5 + 0.5 * Math.sin(T * 13 + e.ph)) : 1.25 + 0.2 * Math.sin(T * 1.6 + e.ph);
+        for (const w of e.wings) { w.ly = w.wy * Math.cos(ang) * e.bs; w.lz = Math.abs(w.wy) * Math.sin(ang) * e.bs; }
+      } else {
+        const up = e.state === 'fly' ? ((T * 30 | 0) % 2 === 0) : false;
+        for (const w of e.wings) { w.ch = e.state === 'fly' ? (up ? '^' : 'v') : '-'; w.lz = (up ? 1.0 : 0.6) * e.bs; }
+      }
+      break;
+    }
+    case 'dragonfly': {
+      if (T > e.next) {
+        e.from = copy3(e.pos);
+        const a = rand(TAU), r = Math.sqrt(Math.random()) * 0.8;
+        e.to = v3(PX + Math.cos(a) * r * PRX, WL + rand(14, 34), PZ + Math.sin(a) * r * PRZ);
+        e.t0 = T; e.next = T + rand(1.5, 3.8); e.h = Math.atan2(e.to.z - e.from.z, e.to.x - e.from.x);
+      }
+      const u = smooth(clamp((T - e.t0) / 0.45, 0, 1));
+      e.pos.x = e.from.x + (e.to.x - e.from.x) * u; e.pos.z = e.from.z + (e.to.z - e.from.z) * u;
+      e.pos.y = e.from.y + (e.to.y - e.from.y) * u + Math.sin(T * 6 + e.ph) * 0.8;
+      for (const w of e.wings) w.ch = Math.random() < 0.5 ? '-' : '~';
+      break;
+    }
+    case 'ladybug': {
+      const f = e.target, r = 0.33 * f.size;
+      e.a += dt * 0.35;
+      e.pos.x = f.p.x + Math.cos(e.a) * r; e.pos.y = f.p.y + TOPZ[f.kind] * f.size + 0.5; e.pos.z = f.p.z + Math.sin(e.a) * r;
+      e.h = e.a + Math.PI / 2;
+      break;
+    }
+    case 'snail': {
+      e.dist += 2.5 * dt;
+      if (e.dist > e.len) { e.dist = 0; e.h += Math.PI; }
+      e.pos.x += Math.cos(e.h) * 2.5 * dt; e.pos.z += Math.sin(e.h) * 2.5 * dt; e.pos.y = hgt(e.pos.x, e.pos.z) + 0.5;
+      break;
+    }
+  }
+  e.F.x = Math.cos(e.h); e.F.z = Math.sin(e.h); e.S.x = -Math.sin(e.h); e.S.z = Math.cos(e.h);
+}
+
+/* ---------- a cat, loafing ---------- */
+function ellipsoidPts(cx, cy, cz, a, b, c, sp, fn) {
+  const area = 4 * Math.PI * Math.pow(((a * b) ** 1.6 + (a * c) ** 1.6 + (b * c) ** 1.6) / 3, 1 / 1.6);
+  const N = Math.round(area / (sp * sp));
+  for (let i = 0; i < N; i++) {
+    const sy = 1 - 2 * (i + .5) / N, rr = Math.sqrt(1 - sy * sy), ang = i * GA;
+    fn(cx + a * rr * Math.cos(ang), cy + b * sy, cz + c * rr * Math.sin(ang));
+  }
+}
+function buildCat(fly, wave) {
+  const s = CAT.s, sp = 3.3;
+  const e = { type: 'cat', isCat: true, kind: 'cat', parts: [], s, size: 40, still: false,
+    fwd: v3(Math.cos(CAT.a), 0, Math.sin(CAT.a)), side: v3(-Math.sin(CAT.a), 0, Math.cos(CAT.a)),
+    base: v3(CAT.x, hgt(CAT.x, CAT.z), CAT.z), eyes: [] };
+  e.p = v3(e.base.x + e.fwd.x * 6 * s, e.base.y + 15 * s, e.base.z + e.fwd.z * 6 * s);
+  elements.push(e); catEl = e;
+  const d0 = wave(CAT.x, CAT.z) + 1;
+  const gm = sp * s / SP;
+  const add = (lx, ly, lz, fm, props) => {
+    const p = P(e, Object.assign({ lx: lx * s, ly: ly * s, lz: lz * s, gs: G.cat, fam: FAMS[fm], gm, part: 'body' }, fly, props));
+    p.delay = d0 + rand(0.6); return p;
+  };
+  // the loaf: body tucked into a rounded bread shape
+  ellipsoidPts(0, 11, 0, 22, 11, 13, sp, (x, y, z) => {
+    if (y < 0.5) return;
+    const chest = x > 15 && y < 13, stripe = Math.sin(x * 0.45) > 0.55 && y > 8;
+    add(x, y, z, chest ? 'catWhite' : stripe ? 'catStripe' : 'catOrange');
+  });
+  // head
+  ellipsoidPts(21, 20, 0, 9, 8.5, 9, sp, (x, y, z) => {
+    const dx = x - 21, dy = y - 20;
+    const muzzle = dx > 5 && dy < 0, stripe = dy > 4 && Math.abs(z) < 3.5 && Math.sin(dx * 1.2) > 0;
+    add(x, y, z, muzzle ? 'catWhite' : stripe ? 'catStripe' : 'catOrange', { part: 'head' });
+  });
+  // ears
+  for (const sd of [-1, 1]) for (let t = 0; t <= 1.001; t += 0.16) {
+    const width = (1 - t) * 5.5, zc = sd * (5.2 + t * 0.8);
+    for (let w = -width / 2; w <= width / 2 + 0.01; w += 1.7)
+      add(19.5, 26 + t * 8, zc + w, Math.abs(w) < width * 0.25 && t < 0.6 ? 'catPink' : 'catOrange', { part: 'ear' });
+  }
+  // face: closed, content eyes, pink nose, little mouth, whiskers
+  for (const sd of [-1, 1]) e.eyes.push(add(29.6, 21.5, sd * 3.6, 'catEye', { ch: '-', gs: ['-'], fixed: true, part: 'head' }));
+  add(30.4, 19, 0, 'catPink', { ch: 'v', gs: ['v'], fixed: true, part: 'head' });
+  add(30.1, 17.4, 0, 'catEye', { ch: 'ω', gs: ['ω'], fixed: true, part: 'head' });
+  for (const sd of [-1, 1]) for (const k of [0, 1]) add(29.5, 18.6 - k * 1.3, sd * (6 + k * 0.6), 'catWhite', { ch: '-', gs: ['-'], fixed: true, part: 'head' });
+  for (const sd of [-1, 1]) add(24, 1.5, sd * 4, 'catWhite', { ch: 'o', gs: ['o'], fixed: true });   // paw tips peeking out
+  // tail wrapped around the side
+  for (let t = 0; t <= 1.001; t += 0.035) {
+    const th = Math.PI - t * 0.75 * Math.PI, x = Math.cos(th) * 24, z = Math.sin(th) * 16;
+    const fm = (t * 12 | 0) % 2 ? 'catStripe' : 'catOrange';
+    add(x, 3.6, z, fm, { part: 'tail', tt: t });
+    add(x * 1.07, 2.2, z * 1.07, fm, { part: 'tail', tt: t });
+  }
+  // dozing z's
+  e.zz = [0, 0.33, 0.66].map(c => add(0, 0, 0, 'zz', { ch: 'z', gs: ['z', 'Z'], part: 'zz', cph: c, gm: gm * 1.3 }));
+}
+function updCat(e) {
+  const open = (T % 11) < 1.0;              // a slow blink every so often
+  for (const p of e.eyes) { p.ch = open ? 'o' : '-'; p.ci = open ? FAMS.leaf[0] : FAMS.catEye[0]; }
 }
 
 /* ---------- zoom into a single flower ---------- */
@@ -966,9 +1291,23 @@ function zoomTo(f) {
   zf = f; f.still = true;
   $ghint.classList.remove('show');
   gcam.transEnd = 0;
-  gcam.tx = f.p.x; gcam.ty = f.p.y + f.size * 0.15; gcam.tz = f.p.z;
-  gcam.pitch = 1.05; gcam.D = 420; gcam.half = f.size * 2; gcam.rate = 1.6;
+  gcam.tx = f.p.x; gcam.ty = f.p.y + (f.isCat ? 0 : f.size * 0.15); gcam.tz = f.p.z;
+  gcam.pitch = f.isCat ? 0.55 : 1.05; gcam.D = 420; gcam.half = f.size * 2; gcam.rate = 1.6;
   gcam.yaw = cam.yaw;
+
+  if (f.isCat) {
+    // swing round to a 3/4 view of the cat's face
+    const want = CAT.a - Math.PI / 2 + 0.5;
+    let d = (want - cam.yaw) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+    gcam.yaw = cam.yaw + d;
+    $info.innerHTML = `<b>LOAFING CAT</b><br>` +
+      `<span class="bee">&#128049; tucked into a perfect loaf</span><br>` +
+      `<span class="bee">purring softly, eyes half closed</span><br>` +
+      `<span class="bee">tail twitches now and then</span><br>` +
+      `<span class="dim">click anywhere or press Esc to return to the garden</span>`;
+    $info.classList.add('show');
+    return;
+  }
 
   const nb = clamp(Math.round(f.size / 14), 1, 5);
   const acts = shuffle(ACTS.slice()).slice(0, nb);
@@ -1135,6 +1474,8 @@ function updateElements(dt) {
       e.Sd.x = -e.D.z; e.Sd.y = 0; e.Sd.z = e.D.x; norm(e.Sd);
     } else if (e.type === 'filler') lerp3(e.p, e.tp, k);
     else if (e.type === 'bee') updBee(e);
+    else if (e.type === 'critter') updCritter(e, dt);
+    else if (e.type === 'cat') updCat(e);
   }
 }
 
@@ -1172,7 +1513,25 @@ function worldOf(p, o) {
         p.am = 0.15 + 0.85 * Math.max(0, Math.sin(T * 1.3 + p.ph));
       }
       return;
-    case 'bee':
+    case 'cat': {
+      let lx = p.lx, ly = p.ly, lz = p.lz;
+      const s = e.s;
+      if (p.part === 'body') ly *= 1 + 0.035 * Math.sin(T * 1.6);                         // breathing
+      else if (p.part === 'head' || p.part === 'ear') {
+        ly += 0.5 * s * Math.sin(T * 1.6);
+        if (p.part === 'ear' && Math.sin(T * 0.43) > 0.96) ly += Math.sin(T * 30) * 0.8 * s; // ear flick
+      }
+      else if (p.part === 'tail') ly += Math.sin(T * 5) * p.tt * p.tt * 6 * s * Math.max(0, Math.sin(T * 0.6)) ** 6;
+      else if (p.part === 'zz') {
+        const c = (T * 0.25 + p.cph) % 1;
+        lx = (22 + c * 6) * s; ly = (32 + c * 24) * s; lz = c * 6 * s; p.am = (1 - c) * Math.min(1, c * 5);
+      }
+      o.x = e.base.x + e.fwd.x * lx + e.side.x * lz;
+      o.y = e.base.y + ly;
+      o.z = e.base.z + e.fwd.z * lx + e.side.z * lz;
+      return;
+    }
+    case 'bee': case 'critter':
       o.x = e.pos.x + e.F.x * p.lx + e.S.x * p.ly;
       o.y = e.pos.y + p.lz;
       o.z = e.pos.z + e.F.z * p.lx + e.S.z * p.ly;
@@ -1370,7 +1729,7 @@ function render(dt) {
 const PO = { x: 0, y: 0, z: 0, k: 0 };
 function pickFlower(mx, my) {
   let best = null, bz = -Infinity;
-  for (const f of gardenFlowers) {
+  for (const f of catEl ? gardenFlowers.concat([catEl]) : gardenFlowers) {
     if (!project(f.p.x, f.p.y, f.p.z, PO)) continue;
     const r = f.size * PO.k * 1.15 + 6;
     if (Math.hypot(PO.x - mx, PO.y - my) < r && PO.z > bz) { bz = PO.z; best = f; }
