@@ -123,7 +123,7 @@ fam('green',      ['#1fae52', '#26c260', '#169443', '#35d071']);
 fam('greenDark',  ['#0f7a35', '#138a3d']);
 fam('leaf',       ['#2ecf68', '#46e07e', '#22b257', '#5fe892']);
 fam('fern',       ['#3cc46a', '#2fae5a', '#58d983']);
-fam('ground',     ['#1d5e2c', '#245f2a', '#2f5a22', '#2b6b33']);
+fam('ground',     ['#2f9a48', '#36a24a', '#4a9a38', '#3cae55']);
 fam('moss',       ['#3f9a4a', '#2f8a3c', '#4fb35a']);
 fam('soil',       ['#9a6a45', '#8a5a3a', '#a8774f']);
 fam('water',      ['#5fb8ff', '#4aa8f0', '#7cc8ff', '#a8dcff']);
@@ -155,7 +155,7 @@ fam('euc',        ['#8fc9b0', '#a3d6c0', '#7bb89e']);
 fam('eucDark',    ['#5f9c84']);
 // garden structure
 fam('brick',      ['#d9976f', '#c98a6a', '#e3a884']);
-fam('soilBed',    ['#6b4a32', '#5e4029', '#76533a']);
+fam('soilBed',    ['#b07a50', '#a06c44', '#c08a5c']);
 fam('picket',     ['#fff6ea', '#f3e9da', '#ffffff']);
 // critters
 fam('dark',       ['#5a3a3a']);
@@ -231,10 +231,6 @@ function sprite(ci, ch) {
   if (!s) {
     s = document.createElement('canvas'); s.width = s.height = SS;
     const g = s.getContext('2d');
-    // small dark backing disc: glyphs in front still hide the ones behind, without dimming neighbours
-    const bg = g.createRadialGradient(SS / 2, SS / 2, 0, SS / 2, SS / 2, SS * 0.3);
-    bg.addColorStop(0, 'rgba(0,0,0,0.85)'); bg.addColorStop(0.6, 'rgba(0,0,0,0.7)'); bg.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = bg; g.fillRect(0, 0, SS, SS);
     const col = vivid(COLORS[ci]);
     g.font = `bold ${FPX}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 7;
@@ -970,7 +966,7 @@ function buildGarden(t0, ex, ey) {
   for (let x = PX - PRX; x <= PX + PRX; x += 13 * GQ) for (let z = PZ - PRZ; z <= PZ + PRZ; z += 13 * GQ) {
     const jx = x + rand(-3, 3), jz = z + rand(-3, 3);
     if (pondD(jx, jz) > 0.97) continue;
-    add(jx, WL, jz, { gs: G.water, fam: FAMS.water, gm: 1.5, am: 0.75 });
+    add(jx, WL, jz, { gs: G.water, fam: FAMS.water, gm: 1.5, am: 0.95 });
   }
   for (let i = 0, n = 70; i < n; i++) {
     const a = i / n * TAU, x = PX + Math.cos(a) * PRX * 1.06, z = PZ + Math.sin(a) * PRZ * 1.08;
@@ -1002,7 +998,7 @@ function buildGarden(t0, ex, ey) {
   for (let x = -GX * 1.1; x <= GX * 1.1; x += 32 * GQ) for (let z = -GZ * 1.1; z <= GZ * 1.1; z += 32 * GQ) {
     const jx = x + rand(-11, 11), jz = z + rand(-11, 11);
     if (!inEll(jx, jz, 1.1) || pondD(jx, jz) < 1.0 || inBed(jx, jz)) continue;
-    add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.ground, gm: 1.5, am: 0.5 });
+    add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.ground, gm: 1.5, am: 0.8 });
   }
   // ---- grass blades ----
   for (let i = 0; i < Math.round(420 * QN); i++) {
@@ -1106,7 +1102,7 @@ function buildGardenExtras(add, wave, fly) {
     for (let x = bed.x - bed.rx; x <= bed.x + bed.rx; x += 17 * GQ) for (let z = bed.z - bed.rz; z <= bed.z + bed.rz; z += 17 * GQ) {
       const jx = x + rand(-5, 5), jz = z + rand(-5, 5);
       if (((jx - bed.x) / bed.rx) ** 2 + ((jz - bed.z) / bed.rz) ** 2 > 0.92) continue;
-      add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.soilBed, gm: 1.4, am: 0.7 });
+      add(jx, hgt(jx, jz), jz, { gs: G.ground, fam: FAMS.soilBed, gm: 1.4, am: 0.9 });
     }
     // brick border
     const per = TAU * Math.sqrt((bed.rx ** 2 + bed.rz ** 2) / 2), n = Math.round(per / 6.5);
@@ -1727,11 +1723,11 @@ function render(dt) {
       const kk = cS / den;
       const tx = cxS + x3 * kk, ty = cyS - y3 * kk;
       let zn = z2 / (half * 1.3); zn = zn < -1 ? -1 : zn > 1 ? 1 : zn;
-      a = 0.72 + 0.28 * zn;
+      a = 0.85 + 0.15 * zn;
       if (p.hasN) {
         const nzr = (-p.nx * syR + p.nz * cyR) * cxR;
         if (nzr < -0.3 && p.state === 2 && !p.el.def.glass) continue;
-        a *= nzr < -0.05 ? 0.3 : (0.75 + 0.25 * nzr);
+        a *= nzr < -0.05 ? 0.45 : (0.85 + 0.15 * nzr);
       }
       const e = p.el;
       const gm = e.type === 'flower' ? (e.size / e.base) * (e.gsp / SP) : p.gm;
