@@ -1350,11 +1350,7 @@ function zoomTo(f) {
     const want = CAT.a - Math.PI / 2 + 0.5;
     let d = (want - cam.yaw) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
     gcam.yaw = cam.yaw + d;
-    $info.innerHTML = `<b>LOAFING CAT</b><br>` +
-      `<span class="bee">&#128049; tucked into a perfect loaf</span><br>` +
-      `<span class="bee">purring softly, eyes half closed</span><br>` +
-      `<span class="bee">tail twitches now and then</span><br>` +
-      `<span class="dim">${BACK_TXT}</span>`;
+    $info.innerHTML = `<b>LEMON PEPPER</b>`;
     $info.classList.add('show');
     return;
   }
@@ -1364,9 +1360,7 @@ function zoomTo(f) {
   acts.forEach((a, i) => makeBee(f, a[0], i));
 
   const name = (SCHEME_NAME[f.scheme] ? SCHEME_NAME[f.scheme] + ' ' : '') + KIND_NAME[f.kind];
-  $info.innerHTML = `<b>${name.toUpperCase()}</b><br>` +
-    acts.map(a => `<span class="bee">&#128029; ${a[1]}</span>`).join('<br>') +
-    `<br><span class="dim">${BACK_TXT}</span>`;
+  $info.innerHTML = `<b>${name.toUpperCase()}</b>`;
   $info.classList.add('show');
 }
 
